@@ -10,7 +10,7 @@ ALL_TICKERS = [
     # Technology Companies
     'AMZN', 'META', 'CSCO', 'ORCL', 'ANET', 'PANW', 'DLTR', 'HPQ', 'CRWD', 'MDB',
     'GTLB', 'SQ', 'ZM', 'PYPL', 'RBLX', 'CFLT', 'ADSK', 'KEYS', 'NOW', 'SOFI',
-    'RIVN', 'QS', 'TEAM', 'ROKU', 'AFRM', 'MNDY'
+    'RIVN', 'QS', 'TEAM', 'ROKU', 'AFRM', 'MNDY',
 
     # Consumer Discretionary Companies
     'TSLA', 'HD', 'NKE', 'MCD', 'DIS', 'LULU', 'ETSY', 'ULTA', 'CMG', 'TGT',

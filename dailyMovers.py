@@ -26,13 +26,13 @@ def calculate_percentage_change(data):
     if today_close < yesterday_close:
         percentage_change = -abs(percentage_change)
 
-    data['Pct Change'] = data['Close'].pct_change() * 100
+    data['Percent Change'] = data['Close'].pct_change() * 100
     
     return percentage_change
 
 def calculate_standard_deviation(data):
-    if 'Pct Change' in data:
-        return data['Pct Change'].std()
+    if 'Percent Change' in data:
+        return data['Percent Change'].std()
     return None
 
 def calculate_volume_change(data):
@@ -66,7 +66,7 @@ def calculate_metrics(ticker):
         return last_price, percentage_change, std_dev, volume, volume_change
 
     except Exception as e:
-        print(f"Error processing {ticker}: {e}")
+        print(f"An error occurred processing {ticker} when calculating metrics")
         return None, None, None, None, None
 
 def get_company_info(ticker):
@@ -77,7 +77,7 @@ def get_company_info(ticker):
         return company_name, sector
 
     except Exception as e:
-        print(f"Error retrieving info for {ticker}: {e}")
+        print(f"An error occurred finding {ticker} company info")
         return 'N/A', 'N/A'
 
 def get_top_moving_tickers(progress_callback=None):
@@ -196,7 +196,7 @@ def show_top_tickers():
         else:
             tag = "negative"
 
-        tree.insert("", tk.END, values=(ticker, company_name, sector, f"${last_price:.2f}", f"{percentage_change:.2f}%", f"{std_dev:.2f}", format_volume(volume), f"{volume_change:.2f}%"), tags=(tag,))
+        tree.insert("", tk.END, values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", format_volume(volume), f"{volume_change:.2f}"), tags=(tag,))
 
     tree.pack(expand=True, fill=tk.BOTH)
     root.update_idletasks()

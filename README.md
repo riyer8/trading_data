@@ -10,17 +10,9 @@ This repository contains stock analysis tools, built in Python.
 - Libraries: `yfinance`, `tkinter`, `pandas`, `matplotlib`, `mplfinance`
 
 Install the required libraries using:
+
 ```bash
 pip install yfinance pandas matplotlib mplfinance
-```
-
-## Usage
-
-**Daily Movers**
-
-Run the script directly:
-```bash
-python top_moving_tickers.py
 ```
 
 ## Work in Progress
