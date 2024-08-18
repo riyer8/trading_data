@@ -7,7 +7,7 @@ import os
 
 from portfolioInfo import ALL_TICKERS
 
-def get_sp500_tickers():
+def get_all_tickers():
     filtered_tickers = set(ALL_TICKERS)
 
     print(f"Total Tickers: {len(ALL_TICKERS)}")
@@ -81,7 +81,7 @@ def get_company_info(ticker):
         return 'N/A', 'N/A'
 
 def get_top_moving_tickers(progress_callback=None):
-    tickers = get_sp500_tickers()
+    tickers = get_all_tickers()
     metrics = []
 
     total = len(tickers)
@@ -179,9 +179,10 @@ def show_top_tickers():
 
     # Custom widths, adjust as needed
     column_widths = {
-        "Ticker": 50, "Company Name": 100, "Sector": 60, "Last Price": 70,
-        "Percentage Change": 120, "Standard Deviation": 120, "Volume": 90, "Volume Change": 120
+        "Ticker": 50, "Company Name": 150, "Sector": 100, "Last Price": 70,
+        "Percentage Change": 70, "Standard Deviation": 70, "Volume": 70, "Volume Change": 70
     }
+    
     for col in columns:
         tree.heading(col, text=col, command=lambda col=col: sort_treeview_column(tree, col, False))
         tree.column(col, width=column_widths[col])
@@ -195,7 +196,7 @@ def show_top_tickers():
         else:
             tag = "negative"
 
-        tree.insert("", tk.END, values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", format_volume(volume), f"{volume_change:.2f}"), tags=(tag,))
+        tree.insert("", tk.END, values=(ticker, company_name, sector, f"${last_price:.2f}", f"{percentage_change:.2f}%", f"{std_dev:.2f}", format_volume(volume), f"{volume_change:.2f}%"), tags=(tag,))
 
     tree.pack(expand=True, fill=tk.BOTH)
     root.update_idletasks()
