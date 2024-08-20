@@ -44,7 +44,7 @@ ALL_TICKERS = [
     'APTV', 'ARE', 'AVGO', 'AWK', 'B', 'BA', 'BAC', 'BAX', 'BBY', 'BDX', 'BEN',
     'BIG', 'BIO', 'BK', 'BKR', 'BLK', 'BMY', 'BR', 'BSX', 'BWA', 'BXP', 'C',
     'CAG', 'CAH', 'CAR', 'CAT', 'CB', 'CBOE', 'CBRE', 'CCL', 'CDNS', 'CDW', 'CE',
-    'CF', 'CFG', 'CHTR', 'CI', 'CINF', 'CL', 'CLX', 'CMA', 'CMG', 'CMI', 'CMS',
+    'CF', 'CFG', 'CHTR', 'CHWY', 'CI', 'CINF', 'CL', 'CLX', 'CMA', 'CMG', 'CMI', 'CMS',
     'CNA', 'CNC', 'CNP', 'COF', 'COO', 'COP', 'COST', 'COTY', 'CPB', 'CPRI', 'CRL',
     'CRM', 'CROX', 'CSCO', 'CME', 'CMTL', 'CNQ', 'CNP', 'COO', 'COP', 'COST', 'COTY',
     'CPB', 'CRWD', 'CSX', 'CTAS', 'CTRA', 'CTSH', 'CVS', 'CWH', 'CWT', 'D', 'DAL',

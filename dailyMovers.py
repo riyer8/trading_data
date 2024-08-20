@@ -1,67 +1,62 @@
 import yfinance as yf
 import tkinter as tk
 from tkinter import ttk
-from portfolioInfo import MY_TICKERS
+from portfolioInfo import MY_TICKERS, ALL_TICKERS
 
 def get_all_tickers():
     print(f"Total Number of Tickers: {len(MY_TICKERS)}")
     return sorted(set(MY_TICKERS))
 
 def calculate_percentage_change(data):
-    yesterday_close = data['Close'].iloc[-2]
+    last_close = data['Close'].iloc[-2]
     today_close = data['Close'].iloc[-1]
-    percentage_change = ((today_close - yesterday_close) / yesterday_close) * 100
+    percentage_change = ((today_close - last_close) / last_close) * 100
 
     data['Percent Change'] = data['Close'].pct_change() * 100
     return percentage_change
 
 def calculate_standard_deviation(data):
-    if 'Percent Change' in data:
-        return data['Percent Change'].std()
-    return None
+    return data['Percent Change'].std()
 
 def calculate_volume_change(data):
-    yesterday_volume = data['Volume'].iloc[-2]
+    last_volume = data['Volume'].iloc[-2]
     today_volume = data['Volume'].iloc[-1]
-    volume_change = ((today_volume - yesterday_volume) / yesterday_volume) * 100
+    volume_change = ((today_volume - last_volume) / last_volume) * 100
 
     return volume_change
 
-def calculate_metrics(ticker):
+def collect_data(ticker):
     data = yf.download(ticker, period="5d", interval="1d")
 
-    if len(data) < 2:
-        return None, None, None, None, None
-
     percentage_change = calculate_percentage_change(data)
-    std_dev = calculate_standard_deviation(data)
+    std_change = calculate_standard_deviation(data)
     volume_change = calculate_volume_change(data)
 
     last_price = data['Close'].iloc[-1]
-    volume = data['Volume'].iloc[-1]
+    current_volume = data['Volume'].iloc[-1]
     
-    return last_price, percentage_change, std_dev, volume, volume_change
+    return last_price, percentage_change, std_change, current_volume, volume_change
 
 def get_company_info(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    company_name = ticker_obj.info.get('longName', 'N/A')
-    sector = ticker_obj.info.get('sector', 'N/A')
+    ticker = yf.Ticker(ticker)
+    company_name = ticker.info.get('longName', 'N/A')
+    sector = ticker.info.get('sector', 'N/A')
     return company_name, sector
 
 def get_top_moving_tickers():
     tickers = get_all_tickers()
-    metrics = []
+    all_data = []
 
     for ticker in tickers:
-        last_price, percentage_change, std_dev, volume, volume_change = calculate_metrics(ticker)
-        if last_price is not None and percentage_change is not None and std_dev is not None:
-            # Filter out any tickers with prices less than $10
-            if last_price >= 10:
-                company_name, sector = get_company_info(ticker)
-                metrics.append((ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change))
+        last_price, percentage_change, std_dev, volume, volume_change = collect_data(ticker)
+        
+        # Filter out any tickers with prices less than $10
+        if last_price >= 10:
+            company_name, sector = get_company_info(ticker)
+            all_data.append((ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change))
 
-    metrics.sort(key=lambda x: x[4], reverse=True)
-    return metrics
+    all_data.sort(key=lambda x: x[4], reverse=True)
+    return all_data
 
 def format_volume(volume):
     if volume >= 1e6:
@@ -116,7 +111,7 @@ def show_top_tickers():
     # Custom widths, adjust as needed
     column_widths = {
         "Ticker": 50, "Company Name": 150, "Sector": 100, "Last Price": 70,
-        "Percentage Change": 70, "Standard Deviation": 70, "Volume": 70, "Volume Change": 70
+        "Percentage Change": 65, "Standard Deviation": 70, "Volume": 70, "Volume Change": 80
     }
     
     for col in columns:

@@ -1,20 +1,22 @@
 # Trading Data Tools
 
-This repository contains stock analysis tools, built in Python.
+This repository contains Python scripts for analyzing stock market data.
 
-**Daily Movers:** This script identifies the top moving stocks based on the list of tickers inputted. It utilizes the `yfinance` library and the Tkinter GUI with sorting capabilities
+## Overview
+
+### **Daily Movers**
+
+Identifies top-moving stocks from a list of tickers, calculates their percentage change, and sorts them using `yfinance`.
+
+### **Market Heat Map**
+
+Generates a heat map of stock percentage changes over the last 5 days using `matplotlib`, with color intensity indicating the magnitude of change.
 
 ## Requirements
 
 - Python 3.x
-- Libraries: `yfinance`, `tkinter`, `pandas`, `matplotlib`, `mplfinance`
-
-Install the required libraries using:
-
-```bash
-pip install yfinance pandas matplotlib mplfinance
-```
+- Libraries: `yfinance`, `pandas`, `matplotlib`
 
 ## Work in Progress
 
-These files are still a work in progress.
+These tools are still under development. Features and functionality may be added or changed in future updates.
