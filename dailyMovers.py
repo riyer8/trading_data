@@ -7,6 +7,14 @@ def get_all_tickers():
     print(f"Total Number of Tickers: {len(MY_TICKERS)}")
     return sorted(set(MY_TICKERS))
 
+# Company name and sector information
+def get_company_info(ticker):
+    ticker = yf.Ticker(ticker)
+    company_name = ticker.info.get('longName', 'N/A')
+    sector = ticker.info.get('sector', 'N/A')
+    return company_name, sector
+
+# Stock percentage change
 def calculate_percentage_change(data):
     last_close = data['Close'].iloc[-2]
     today_close = data['Close'].iloc[-1]
@@ -15,9 +23,11 @@ def calculate_percentage_change(data):
     data['Percent Change'] = data['Close'].pct_change() * 100
     return percentage_change
 
+# Standard deviation calculation
 def calculate_standard_deviation(data):
     return data['Percent Change'].std()
 
+# Stock volume change
 def calculate_volume_change(data):
     last_volume = data['Volume'].iloc[-2]
     today_volume = data['Volume'].iloc[-1]
@@ -25,6 +35,7 @@ def calculate_volume_change(data):
 
     return volume_change
 
+# Combining all stock information
 def collect_data(ticker):
     data = yf.download(ticker, period="5d", interval="1d")
 
@@ -37,27 +48,22 @@ def collect_data(ticker):
     
     return last_price, percentage_change, std_change, current_volume, volume_change
 
-def get_company_info(ticker):
-    ticker = yf.Ticker(ticker)
-    company_name = ticker.info.get('longName', 'N/A')
-    sector = ticker.info.get('sector', 'N/A')
-    return company_name, sector
-
-def get_top_moving_tickers():
+# Filter tickers for prices less than $10
+def filter_tickers():
     tickers = get_all_tickers()
-    all_data = []
+    data = []
 
     for ticker in tickers:
         last_price, percentage_change, std_dev, volume, volume_change = collect_data(ticker)
         
-        # Filter out any tickers with prices less than $10
         if last_price >= 10:
             company_name, sector = get_company_info(ticker)
-            all_data.append((ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change))
+            data.append((ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change))
 
-    all_data.sort(key=lambda x: x[4], reverse=True)
-    return all_data
+    data.sort(key=lambda x: x[4], reverse=True)
+    return data
 
+# Formatting volume
 def format_volume(volume):
     if volume >= 1e6:
         return f"{volume / 1e6:.2f}M"
@@ -74,6 +80,7 @@ def convert_volume_to_numeric(volume_str):
     else:
         return float(volume_str)
 
+# Sorting columns logic -- along with custom sorting information
 def sort_treeview_column(treeview, column, reverse):
     column_indices = {"Ticker": 0, "Company Name": 1, "Sector": 2, "Last Price": 3, "Percentage Change": 4, "Standard Deviation": 5, "Volume": 6, "Volume Change": 7}
     col_index = column_indices[column]
@@ -100,15 +107,18 @@ def sort_treeview_column(treeview, column, reverse):
     arrow = "↓" if reverse else "↑"
     treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_treeview_column(treeview, column, not reverse))
 
-def show_top_tickers():
+# Show top tickers
+def display_tickers():
     root = tk.Tk()
     root.title("Top Moving Tickers")
 
-    top_moving_tickers = get_top_moving_tickers()
-    columns = ("Ticker", "Company Name", "Sector", "Last Price", "Percentage Change", "Standard Deviation", "Volume", "Volume Change")
-    tree = ttk.Treeview(root, columns=columns, show='headings')
+    frame = tk.Frame(root)
+    frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-    # Custom widths, adjust as needed
+    top_moving_tickers = filter_tickers()
+    columns = ("Ticker", "Company Name", "Sector", "Last Price", "Percentage Change", "Standard Deviation", "Volume", "Volume Change")
+    tree = ttk.Treeview(frame, columns=columns, show='headings')
+
     column_widths = {
         "Ticker": 50, "Company Name": 150, "Sector": 100, "Last Price": 70,
         "Percentage Change": 65, "Standard Deviation": 70, "Volume": 70, "Volume Change": 80
@@ -129,4 +139,4 @@ def show_top_tickers():
     root.mainloop()
 
 if __name__ == "__main__":
-    show_top_tickers()
+    display_tickers()
