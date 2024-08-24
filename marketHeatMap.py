@@ -1,14 +1,11 @@
 import yfinance as yf
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from matplotlib.patches import Rectangle
-
 from portfolioInfo import ALL_TICKERS, MY_TICKERS
 
-def get_all_tickers():
-    filtered_tickers = set(MY_TICKERS + ALL_TICKERS)
+def all_tickers():
+    filtered_tickers = set(MY_TICKERS)
     print(f"Total tickers: {len(filtered_tickers)}")
     return sorted(filtered_tickers)
 
@@ -19,8 +16,8 @@ def calculate_percentage_change(data):
 
     return percentage_change
 
-def get_top_moving_tickers():
-    tickers = get_all_tickers()
+def top_moving_tickers():
+    tickers = all_tickers()
     metrics = []
     for ticker in tickers:
         data = yf.download(ticker, period="5d", interval="1d")
@@ -30,13 +27,12 @@ def get_top_moving_tickers():
     metrics.sort(key=lambda x: x[1], reverse=True)
     return metrics
 
-def plot_heat_map(tickers_data):
+def heat_map(tickers_data):
     tickers = [item[0] for item in tickers_data]
     percentages = [item[1] for item in tickers_data]
 
     num_tickers = len(tickers)
 
-    # Make the heat map a square
     size = int(np.ceil(np.sqrt(num_tickers)))
     data = np.full((size, size), np.nan)
 
@@ -64,5 +60,5 @@ def plot_heat_map(tickers_data):
     plt.show()
 
 if __name__ == "__main__":
-    top_moving_tickers = get_top_moving_tickers()
-    plot_heat_map(top_moving_tickers)
+    top_moving_tickers = top_moving_tickers()
+    heat_map(top_moving_tickers)

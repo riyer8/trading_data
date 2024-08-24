@@ -16,11 +16,6 @@ Generates a heat map of stock percentage changes over the last 5 days using `mat
 
 Displays upcoming earnings dates for selected tickers, organized by company and sector, with sorting functionality provided by `yfinance`.
 
-## Requirements
-
-- Python 3.x
-- Libraries: `yfinance`, `pandas`, `matplotlib`
-
 ## Work in Progress 🎉
 
 These tools are still under development. Features and functionality may be added or changed in future updates.

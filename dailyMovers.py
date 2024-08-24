@@ -3,18 +3,16 @@ import tkinter as tk
 from tkinter import ttk
 from portfolioInfo import MY_TICKERS, ALL_TICKERS
 
-def get_all_tickers():
+def all_tickers():
     print(f"Total Number of Tickers: {len(MY_TICKERS)}")
     return sorted(set(MY_TICKERS))
 
-# Company name and sector information
-def get_company_info(ticker):
+def company_info(ticker):
     ticker = yf.Ticker(ticker)
     company_name = ticker.info.get('longName', 'N/A')
     sector = ticker.info.get('sector', 'N/A')
     return company_name, sector
 
-# Stock percentage change
 def calculate_percentage_change(data):
     last_close = data['Close'].iloc[-2]
     today_close = data['Close'].iloc[-1]
@@ -23,11 +21,9 @@ def calculate_percentage_change(data):
     data['Percent Change'] = data['Close'].pct_change() * 100
     return percentage_change
 
-# Standard deviation calculation
 def calculate_standard_deviation(data):
     return data['Percent Change'].std()
 
-# Stock volume change
 def calculate_volume_change(data):
     last_volume = data['Volume'].iloc[-2]
     today_volume = data['Volume'].iloc[-1]
@@ -35,7 +31,22 @@ def calculate_volume_change(data):
 
     return volume_change
 
-# Combining all stock information
+def volume_to_string(volume):
+    if volume >= 1e6:
+        return f"{volume / 1e6:.2f}M"
+    elif volume >= 1e3:
+        return f"{volume / 1e3:.2f}K"
+    else:
+        return f"{volume:.2f}"
+
+def string_to_volume(volume_str):
+    if volume_str.endswith('M'):
+        return float(volume_str[:-1]) * 1e6
+    elif volume_str.endswith('K'):
+        return float(volume_str[:-1]) * 1e3
+    else:
+        return float(volume_str)
+
 def collect_data(ticker):
     data = yf.download(ticker, period="5d", interval="1d")
 
@@ -48,40 +59,20 @@ def collect_data(ticker):
     
     return last_price, percentage_change, std_change, current_volume, volume_change
 
-# Filter tickers for prices less than $10
 def filter_tickers():
-    tickers = get_all_tickers()
+    tickers = all_tickers()
     data = []
 
     for ticker in tickers:
         last_price, percentage_change, std_dev, volume, volume_change = collect_data(ticker)
-        
         if last_price >= 10:
-            company_name, sector = get_company_info(ticker)
+            company_name, sector = company_info(ticker)
             data.append((ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change))
 
     data.sort(key=lambda x: x[4], reverse=True)
     return data
 
-# Formatting volume
-def format_volume(volume):
-    if volume >= 1e6:
-        return f"{volume / 1e6:.2f}M"
-    elif volume >= 1e3:
-        return f"{volume / 1e3:.2f}K"
-    else:
-        return f"{volume:.2f}"
-
-def convert_volume_to_numeric(volume_str):
-    if volume_str.endswith('M'):
-        return float(volume_str[:-1]) * 1e6
-    elif volume_str.endswith('K'):
-        return float(volume_str[:-1]) * 1e3
-    else:
-        return float(volume_str)
-
-# Sorting columns logic -- along with custom sorting information
-def sort_treeview_column(treeview, column, reverse):
+def sort_tickers(treeview, column, reverse):
     column_indices = {"Ticker": 0, "Company Name": 1, "Sector": 2, "Last Price": 3, "Percentage Change": 4, "Standard Deviation": 5, "Volume": 6, "Volume Change": 7}
     col_index = column_indices[column]
 
@@ -89,7 +80,7 @@ def sort_treeview_column(treeview, column, reverse):
 
     if column in ["Last Price", "Percentage Change", "Standard Deviation", "Volume", "Volume Change"]:
         if column == "Volume":
-            items.sort(key=lambda x: convert_volume_to_numeric(x[0][col_index]), reverse=reverse)
+            items.sort(key=lambda x: string_to_volume(x[0][col_index]), reverse=reverse)
         else:
             items.sort(key=lambda x: float(x[0][col_index]), reverse=reverse)
     else:
@@ -105,9 +96,18 @@ def sort_treeview_column(treeview, column, reverse):
         treeview.heading(col, text=col)
 
     arrow = "↓" if reverse else "↑"
-    treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_treeview_column(treeview, column, not reverse))
+    treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_tickers(treeview, column, not reverse))
 
-# Show top tickers
+def update_tickers(tree):
+    top_moving_tickers = filter_tickers()
+    existing_items = tree.get_children()
+
+    for i, (ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change) in enumerate(top_moving_tickers):
+        tag = "positive" if percentage_change > 0 else "negative"
+        tree.item(existing_items[i], values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", volume_to_string(volume), f"{volume_change:.2f}"), tags=(tag,))
+    
+    tree.after(60000, update_tickers, tree)
+
 def display_tickers():
     root = tk.Tk()
     root.title("Top Moving Tickers")
@@ -125,7 +125,7 @@ def display_tickers():
     }
     
     for col in columns:
-        tree.heading(col, text=col, command=lambda col=col: sort_treeview_column(tree, col, False))
+        tree.heading(col, text=col, command=lambda col=col: sort_tickers(tree, col, False))
         tree.column(col, width=column_widths[col])
 
     tree.tag_configure("positive", foreground="green")
@@ -133,9 +133,11 @@ def display_tickers():
 
     for ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change in top_moving_tickers:
         tag = "positive" if percentage_change > 0 else "negative"
-        tree.insert("", tk.END, values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", format_volume(volume), f"{volume_change:.2f}"), tags=(tag,))
+        tree.insert("", tk.END, values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", volume_to_string(volume), f"{volume_change:.2f}"), tags=(tag,))
 
     tree.pack(expand=True, fill=tk.BOTH)
+    
+    update_tickers(tree)
     root.mainloop()
 
 if __name__ == "__main__":
