@@ -1,19 +1,17 @@
-import yfinance as yf
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+import yfinance as yf
 from portfolioInfo import ALL_TICKERS, MY_TICKERS
 
 def all_tickers():
-    filtered_tickers = set(MY_TICKERS)
-    print(f"Total tickers: {len(filtered_tickers)}")
-    return sorted(filtered_tickers)
+    print(f"Total tickers: {len(MY_TICKERS)}")
+    return sorted(set(MY_TICKERS))
 
 def calculate_percentage_change(data):
     last_close = data['Close'].iloc[-2]
     today_close = data['Close'].iloc[-1]
     percentage_change = ((today_close - last_close) / last_close) * 100
-
     return percentage_change
 
 def top_moving_tickers():
@@ -23,7 +21,6 @@ def top_moving_tickers():
         data = yf.download(ticker, period="5d", interval="1d")
         percentage_change = calculate_percentage_change(data)
         metrics.append((ticker, percentage_change))
-            
     metrics.sort(key=lambda x: x[1], reverse=True)
     return metrics
 
@@ -32,7 +29,6 @@ def heat_map(tickers_data):
     percentages = [item[1] for item in tickers_data]
 
     num_tickers = len(tickers)
-
     size = int(np.ceil(np.sqrt(num_tickers)))
     data = np.full((size, size), np.nan)
 

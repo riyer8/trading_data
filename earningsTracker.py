@@ -1,7 +1,7 @@
-import yfinance as yf
+from datetime import date
 import tkinter as tk
 from tkinter import ttk
-from datetime import date
+import yfinance as yf
 from portfolioInfo import MY_TICKERS
 
 def all_tickers():
@@ -14,7 +14,7 @@ def company_info(ticker):
     sector = ticker_obj.info.get('sector', 'N/A')
     return company_name, sector
 
-def get_upcoming_earnings(ticker):
+def find_next_earnings(ticker):
     ticker_obj = yf.Ticker(ticker)
     today_date = date.today()
     calendar = ticker_obj.calendar
@@ -35,11 +35,11 @@ def filter_tickers():
 
     for ticker in tickers:
         company_name, sector = company_info(ticker)
-        upcoming_earnings = get_upcoming_earnings(ticker)
+        next_earnings = find_next_earnings(ticker)
+        if next_earnings != 'N/A':
+            data.append([ticker, company_name, sector, next_earnings])
 
-        if upcoming_earnings != 'N/A':
-            data.append([ticker, company_name, sector, upcoming_earnings])
-
+    data.sort(key=lambda x: x[3], reverse=True)
     return data
 
 def sort_tickers(treeview, column, reverse):

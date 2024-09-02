@@ -1,6 +1,6 @@
-import yfinance as yf
 import tkinter as tk
 from tkinter import ttk
+import yfinance as yf
 from portfolioInfo import MY_TICKERS, ALL_TICKERS
 
 def all_tickers():
@@ -17,18 +17,16 @@ def calculate_percentage_change(data):
     last_close = data['Close'].iloc[-2]
     today_close = data['Close'].iloc[-1]
     percentage_change = ((today_close - last_close) / last_close) * 100
-
-    data['Percent Change'] = data['Close'].pct_change() * 100
     return percentage_change
 
 def calculate_standard_deviation(data):
+    data['Percent Change'] = data['Close'].pct_change() * 100
     return data['Percent Change'].std()
 
 def calculate_volume_change(data):
     last_volume = data['Volume'].iloc[-2]
     today_volume = data['Volume'].iloc[-1]
     volume_change = ((today_volume - last_volume) / last_volume) * 100
-
     return volume_change
 
 def volume_to_string(volume):
@@ -50,14 +48,13 @@ def string_to_volume(volume_str):
 def collect_data(ticker):
     data = yf.download(ticker, period="5d", interval="1d")
 
+    last_price = data['Close'].iloc[-1]
     percentage_change = calculate_percentage_change(data)
     std_change = calculate_standard_deviation(data)
+    last_volume = data['Volume'].iloc[-1]
     volume_change = calculate_volume_change(data)
-
-    last_price = data['Close'].iloc[-1]
-    current_volume = data['Volume'].iloc[-1]
     
-    return last_price, percentage_change, std_change, current_volume, volume_change
+    return last_price, percentage_change, std_change, last_volume, volume_change
 
 def filter_tickers():
     tickers = all_tickers()
@@ -98,16 +95,6 @@ def sort_tickers(treeview, column, reverse):
     arrow = "↓" if reverse else "↑"
     treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_tickers(treeview, column, not reverse))
 
-def update_tickers(tree):
-    top_moving_tickers = filter_tickers()
-    existing_items = tree.get_children()
-
-    for i, (ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change) in enumerate(top_moving_tickers):
-        tag = "positive" if percentage_change > 0 else "negative"
-        tree.item(existing_items[i], values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", volume_to_string(volume), f"{volume_change:.2f}"), tags=(tag,))
-    
-    tree.after(60000, update_tickers, tree)
-
 def display_tickers():
     root = tk.Tk()
     root.title("Top Moving Tickers")
@@ -136,8 +123,6 @@ def display_tickers():
         tree.insert("", tk.END, values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", volume_to_string(volume), f"{volume_change:.2f}"), tags=(tag,))
 
     tree.pack(expand=True, fill=tk.BOTH)
-    
-    update_tickers(tree)
     root.mainloop()
 
 if __name__ == "__main__":

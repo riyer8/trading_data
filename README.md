@@ -1,21 +1,25 @@
 # Trading Data Tools
 
-This repository contains Python scripts for analyzing stock market data.
+This repository houses Python scripts designed to create screeners for analyzing stock market data.
 
 ## Overview
 
+### **Correlation**
+
+Identifies the most closely correlated tickers to a target ticker, based on factors like sector, industry, market cap, beta, volume, and liquidity, using data from `yfinance`. Users can specify a minimum desired correlation level, and the tool will display all tickers exceeding that threshold.
+
 ### **Daily Movers**
 
-Identifies top-moving stocks from a list of tickers, calculates their percentage change, and sorts them using `yfinance`.
-
-### **Market Heat Map**
-
-Generates a heat map of stock percentage changes over the last 5 days using `matplotlib`, with color intensity indicating the magnitude of change.
+Detects the top-moving stocks from a list of tickers, calculates their percentage changes, and ranks them accordingly using `yfinance`.
 
 ### **Earnings Tracker**
 
-Displays upcoming earnings dates for selected tickers, organized by company and sector, with sorting functionality provided by `yfinance`.
+Lists upcoming earnings dates for selected tickers, categorized by company and sector, with sorting capabilities provided by `yfinance`.
+
+### **Market Heat Map**
+
+Creates a heat map showing stock percentage changes over the last 5 days, using `matplotlib`, with color intensity reflecting the magnitude of the changes.
 
 ## Work in Progress 🎉
 
-These tools are still under development. Features and functionality may be added or changed in future updates.
+These tools are currently under development. Features and functionalities may be added or modified in future updates.
