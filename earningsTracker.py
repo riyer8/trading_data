@@ -19,14 +19,16 @@ def find_next_earnings(ticker):
     today_date = date.today()
     calendar = ticker_obj.calendar
 
-    if (len(calendar['Earnings Date']) == 0):
+    if len(calendar['Earnings Date']) == 0:
         return 'N/A'
+    
     next_earnings = calendar['Earnings Date'][0]
-
-    if (next_earnings < today_date):
-        if (len(calendar['Earnings Date']) < 2):
+    
+    if next_earnings < today_date:
+        if len(calendar['Earnings Date']) < 2:
             return 'N/A'
         return calendar['Earnings Date'][1]
+    
     return next_earnings
 
 def filter_tickers():
@@ -39,8 +41,7 @@ def filter_tickers():
         if next_earnings != 'N/A':
             data.append([ticker, company_name, sector, next_earnings])
 
-    data.sort(key=lambda x: x[3], reverse=True)
-    return data
+    return sorted(data, key=lambda x: x[3], reverse=True)
 
 def sort_tickers(treeview, column, reverse):
     column_indices = {"Ticker": 0, "Company Name": 1, "Sector": 2, "Upcoming Earnings": 3}
@@ -54,7 +55,7 @@ def sort_tickers(treeview, column, reverse):
         items.sort(key=lambda x: x[0][col_index], reverse=reverse)
 
     treeview.delete(*treeview.get_children())
-    for index, (values, item) in enumerate(items):
+    for values, item in items:
         treeview.insert("", tk.END, iid=item, values=values)
 
     for col in column_indices:

@@ -1,20 +1,14 @@
-# AI Companies
-AI_COMPANIES = [
-    'NVDA', 'AMD', 'IBM', 'GOOGL', 'MSFT', 'AAPL', 'INTC', 'BABA', 'PLTR', 'CRM',
-    'HPE', 'DELL', 'ADBE', 'AI', 'SHOP', 'TWLO', 'SPOT', 'Z', 'DDOG', 'PINS',
-    'SNOW'
+# Technology Companies
+TECHNOLOGY_COMPANIES = [
+    'AMD', 'IBM', 'CRM', 'HPE', 'DELL', 'ADBE', 'AI', 'SHOP', 'TWLO', 'SPOT', 'Z', 'DDOG', 'PINS',
+    'AMZN', 'META', 'CSCO', 'ORCL', 'ANET', 'PANW', 'DLTR', 'HPQ', 'CRWD', 'MDB',
+    'GTLB', 'SQ', 'ZM', 'PYPL', 'RBLX', 'CFLT', 'ADSK', 'KEYS', 'NOW', 'SOFI',
+    'RIVN', 'QS', 'TEAM', 'ROKU', 'AFRM', 'MNDY', 'GOOGL', 'MSFT', 'AAPL', 'INTC', 'BABA', 'PLTR'
 ]
 
 # Semiconductor Companies
 SEMICONDUCTOR_COMPANIES = [
-    'ASML', 'MU', 'AMAT', 'LRCX', 'AVGO', 'QCOM', 'ON', 'SMCI', 'CRUS'
-]
-
-# Technology Companies
-TECHNOLOGY_COMPANIES = [
-    'AMZN', 'META', 'CSCO', 'ORCL', 'ANET', 'PANW', 'DLTR', 'HPQ', 'CRWD', 'MDB',
-    'GTLB', 'SQ', 'ZM', 'PYPL', 'RBLX', 'CFLT', 'ADSK', 'KEYS', 'NOW', 'SOFI',
-    'RIVN', 'QS', 'TEAM', 'ROKU', 'AFRM', 'MNDY'
+    'NVDA', 'ASML', 'MU', 'AMAT', 'LRCX', 'AVGO', 'QCOM', 'ON', 'SMCI', 'CRUS'
 ]
 
 # Consumer Discretionary Companies
@@ -63,14 +57,14 @@ TRAVEL_COMPANIES = [
     'UAL', 'AAL', 'DAL', 'CCL', 'RCL'
 ]
 
-MY_TICKERS = (
-    AI_COMPANIES + SEMICONDUCTOR_COMPANIES + TECHNOLOGY_COMPANIES +
+MY_TICKERS = sorted(list(set((
+    SEMICONDUCTOR_COMPANIES + TECHNOLOGY_COMPANIES +
     CONSUMER_DISCRETIONARY_COMPANIES + ENERGY_COMPANIES + HEALTHCARE_COMPANIES +
     FINANCIAL_COMPANIES + CONSUMER_STAPLES_COMPANIES + COMMUNICATION_COMPANIES +
     UTILITIES_COMPANIES + MATERIALS_COMPANIES + TRAVEL_COMPANIES
-)
+))))
 
-ALL_TICKERS = [
+ALL_TICKERS = sorted(list(set([
     'A', 'AAL', 'AAP', 'AAPL', 'AIG', 'AIZ', 'ALB', 'ALK', 'ALL', 'AMAT', 'AMD',
     'AMCR', 'AMED', 'AMP', 'AMT', 'AMZN', 'ANET', 'AON', 'APA', 'APAM', 'APD',
     'APTV', 'ARE', 'AVGO', 'AWK', 'B', 'BA', 'BAC', 'BAX', 'BBY', 'BDX', 'BEN',
@@ -107,4 +101,4 @@ ALL_TICKERS = [
     'UPS', 'URBN', 'USB', 'V', 'VFC', 'VLO', 'VMC', 'VNO', 'VRSN', 'VZ', 'WBA',
     'WBD', 'WDC', 'WELL', 'WFC', 'WMT', 'WRB', 'WST', 'WU', 'WYNN', 'XEL',
     'XOM', 'XPO', 'YUM', 'ZBH', 'ZBRA', 'ZION', 'ZTS'
-]
+] + MY_TICKERS)))

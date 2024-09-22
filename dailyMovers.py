@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import yfinance as yf
 from portfolioInfo import MY_TICKERS, ALL_TICKERS
+from stockChart import main as plot_stock_chart
 
 def all_tickers():
     print(f"Total Number of Tickers: {len(MY_TICKERS)}")
@@ -95,6 +96,11 @@ def sort_tickers(treeview, column, reverse):
     arrow = "↓" if reverse else "↑"
     treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_tickers(treeview, column, not reverse))
 
+def on_ticker_double_click(event, tree):
+    item = tree.selection()[0]
+    ticker = tree.item(item, 'values')[0]
+    plot_stock_chart(ticker, 6)
+
 def display_tickers():
     root = tk.Tk()
     root.title("Top Moving Tickers")
@@ -117,6 +123,8 @@ def display_tickers():
 
     tree.tag_configure("positive", foreground="green")
     tree.tag_configure("negative", foreground="red")
+
+    tree.bind("<Double-1>", lambda event: on_ticker_double_click(event, tree))
 
     for ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change in top_moving_tickers:
         tag = "positive" if percentage_change > 0 else "negative"
