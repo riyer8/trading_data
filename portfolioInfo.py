@@ -103,4 +103,4 @@ ALL_TICKERS = sorted(list(set([
     'UPS', 'URBN', 'USB', 'V', 'VFC', 'VLO', 'VMC', 'VNO', 'VRSN', 'VZ', 'WBA',
     'WBD', 'WDC', 'WELL', 'WFC', 'WMT', 'WRB', 'WST', 'WU', 'WYNN', 'XEL',
     'XOM', 'XPO', 'YUM', 'ZBH', 'ZBRA', 'ZION', 'ZTS'
-] + MY_TICKERS)))
+    ] + MY_TICKERS)))

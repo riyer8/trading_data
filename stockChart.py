@@ -38,7 +38,7 @@ def plot_candlestick_chart(ticker, data, lookback_months, moving_averages, bolli
         data,
         type='candle',
         style='charles',
-        title=f'{ticker} Candlestick Chart (Last {lookback_months} Months)',
+        title=f'{ticker.upper()} Candlestick Chart (Last {lookback_months} Months)',
         ylabel='Price (USD)',
         addplot=moving_averages,
         figratio=(12, 8),
