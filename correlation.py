@@ -2,29 +2,28 @@ from datetime import date
 import tkinter as tk
 from tkinter import ttk
 import yfinance as yf
-from portfolioInfo import ALL_TICKERS
+from portfolioInfo import PYPL_TICKERS
 from scipy.stats import pearsonr
 
 CORRELATION_WEIGHTS = {
-    'beta': 1.0,
-    'industry': 2.0,
-    'liquidity': 2.0,
-    'market_cap': 1.0,
-    'sector': 2.0,
+    'beta': 0,
+    'industry': 0,
+    'liquidity': 0,
+    'market_cap': 0,
+    'sector': 0,
     'volume': 1.0,
-    'pearson': 3.0,
-    'dividend_yield': 1.5,
-    'pe_ratio': 1.0,
-    'pb_ratio': 1.0
+    'pearson': 0,
+    'returns': 0,
+    'dividend_yield': 0,
+    'pe_ratio': 0,
+    'pb_ratio': 0,
+    'gross_margin': 1.0,
+    'peg_ratio': 1.0,
 }
 
 def ticker_data(ticker):
     ticker_obj = yf.Ticker(ticker)
-    return ticker_obj.history(period="6mo"), ticker_obj.info
-
-def company_info(ticker):
-    _, info = ticker_data(ticker)
-    return info.get('longName', 'N/A'), info.get('sector', 'N/A')
+    return ticker_obj.history(period="1y"), ticker_obj.info
 
 def sector_similarity(target_info, compare_info):
     if target_info.get('sector') == compare_info.get('sector'):
@@ -70,38 +69,84 @@ def liquidity_similarity(target_info, compare_info, target_ticker, compare_ticke
         return 1
     if max(bid_ask_spread1, bid_ask_spread2) > 0:
         return 1 - abs(bid_ask_spread1 - bid_ask_spread2) / max(bid_ask_spread1, bid_ask_spread2)
-    return 0
 
 def pearson_correlation(target_ticker, compare_ticker):
+    if target_ticker == compare_ticker:
+        return 1
     target_data, _ = ticker_data(target_ticker)
     compare_data, _ = ticker_data(compare_ticker)
+
     target_prices = target_data['Close'].dropna()
     compare_prices = compare_data['Close'].dropna()
-    combined_data = target_prices.align(compare_prices, join='inner')[0]
-    if len(combined_data) < 30:
+    aligned_target, aligned_compare = target_prices.align(compare_prices, join='inner')
+    
+    if len(aligned_target) < 30:
         return 0
-    pearson_corr, _ = pearsonr(combined_data, compare_data.loc[combined_data.index]['Close'])
-    return pearson_corr if not isinstance(pearson_corr, float) or not pearson_corr != pearson_corr else 0
 
-def dividend_yield_similarity(target_info, compare_info):
+    target_returns = aligned_target.pct_change().dropna()
+    compare_returns = aligned_compare.pct_change().dropna()
+    returns_correlation, _ = pearsonr(target_returns, compare_returns)
+    
+    return returns_correlation if isinstance(returns_correlation, float) else 0
+
+def returns_correlation(target_ticker, compare_ticker):
+    if target_ticker == compare_ticker:
+        return 1
+    target_data, _ = ticker_data(target_ticker)
+    compare_data, _ = ticker_data(compare_ticker)
+
+    target_returns = target_data['Close'].pct_change().dropna()
+    compare_returns = compare_data['Close'].pct_change().dropna()
+    aligned_target, aligned_compare = target_returns.align(compare_returns, join='inner')
+    
+    if len(aligned_target) < 30:
+        return 0
+
+    return pearsonr(aligned_target, aligned_compare)[0]
+
+def dividend_yield_similarity(target_info, compare_info, target_ticker, compare_ticker):
+    if target_ticker == compare_ticker:
+        return 1
     div_yield1 = target_info.get('dividendYield', 0) or 0
     div_yield2 = compare_info.get('dividendYield', 0) or 0
     if max(div_yield1, div_yield2) > 0:
         return 1 - abs(div_yield1 - div_yield2) / max(div_yield1, div_yield2)
     return 0
 
-def pe_ratio_similarity(target_info, compare_info):
+def pe_ratio_similarity(target_info, compare_info, target_ticker, compare_ticker):
+    if target_ticker == compare_ticker:
+        return 1
     pe1 = target_info.get('trailingPE', 0) or 0
     pe2 = compare_info.get('trailingPE', 0) or 0
     if max(pe1, pe2) > 0:
         return 1 - abs(pe1 - pe2) / max(pe1, pe2)
     return 0
 
-def pb_ratio_similarity(target_info, compare_info):
+def pb_ratio_similarity(target_info, compare_info, target_ticker, compare_ticker):
+    if target_ticker == compare_ticker:
+        return 1
     pb1 = target_info.get('priceToBook', 0) or 0
     pb2 = compare_info.get('priceToBook', 0) or 0
     if max(pb1, pb2) > 0:
         return 1 - abs(pb1 - pb2) / max(pb1, pb2)
+    return 0
+
+def gross_margin_similarity(target_info, compare_info, target_ticker, compare_ticker):
+    if target_ticker == compare_ticker:
+        return 1
+    gross_margin1 = target_info.get('grossMargins', 0) or 0
+    gross_margin2 = compare_info.get('grossMargins', 0) or 0
+    if max(gross_margin1, gross_margin2) > 0:
+        return 1 - abs(gross_margin1 - gross_margin2) / max(gross_margin1, gross_margin2)
+    return 0
+
+def peg_ratio_similarity(target_info, compare_info, target_ticker, compare_ticker):
+    if target_ticker == compare_ticker:
+        return 1
+    peg1 = target_info.get('pegRatio', 0) or 0
+    peg2 = compare_info.get('pegRatio', 0) or 0
+    if max(peg1, peg2) > 0:
+        return 1 - abs(peg1 - peg2) / max(peg1, peg2)
     return 0
 
 def correlation_factor(target_info, compare_info, target_ticker, compare_ticker):
@@ -113,42 +158,28 @@ def correlation_factor(target_info, compare_info, target_ticker, compare_ticker)
         volume_similarity(target_info, compare_info, target_ticker, compare_ticker),
         liquidity_similarity(target_info, compare_info, target_ticker, compare_ticker),
         pearson_correlation(target_ticker, compare_ticker),
-        dividend_yield_similarity(target_info, compare_info),
-        pe_ratio_similarity(target_info, compare_info),
-        pb_ratio_similarity(target_info, compare_info)
+        returns_correlation(target_ticker, compare_ticker),
+        dividend_yield_similarity(target_info, compare_info, target_ticker, compare_ticker),
+        pe_ratio_similarity(target_info, compare_info, target_ticker, compare_ticker),
+        pb_ratio_similarity(target_info, compare_info, target_ticker, compare_ticker),
+        gross_margin_similarity(target_info, compare_info, target_ticker, compare_ticker),
+        peg_ratio_similarity(target_info, compare_info, target_ticker, compare_ticker)
     ]
 
     weighted_sum = sum(weight * sim for weight, sim in zip(CORRELATION_WEIGHTS.values(), similarities))
     return weighted_sum / sum(CORRELATION_WEIGHTS.values())
 
-def find_next_earnings(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    today_date = date.today()
-    calendar = ticker_obj.calendar
-
-    if not calendar.get('Earnings Date'):
-        return 'N/A'
-
-    next_earnings = calendar['Earnings Date'][0]
-    if next_earnings < today_date:
-        if len(calendar['Earnings Date']) < 2:
-            return 'N/A'
-        return calendar['Earnings Date'][1]
-    
-    return next_earnings
-
 def filter_tickers(symbol, min_corr_factor):
     _, target_info = ticker_data(symbol)
     filtered_tickers = []
 
-    for ticker in ALL_TICKERS:
+    for ticker in PYPL_TICKERS:
         _, compare_info = ticker_data(ticker)
         corr_factor = correlation_factor(target_info, compare_info, symbol, ticker)
         if corr_factor >= min_corr_factor:
-            company_name, sector = company_info(ticker)
-            last_price = compare_info.get('previousClose', 0)
-            earnings_date = find_next_earnings(ticker)
-            filtered_tickers.append((ticker, company_name, corr_factor, sector, last_price, earnings_date))
+            company_name = compare_info.get('longName', 'N/A')
+            current_price = compare_info.get('last_price', compare_info.get('currentPrice', 0))  # Fetch current price
+            filtered_tickers.append((ticker, company_name, corr_factor, current_price))
 
     return sorted(filtered_tickers, key=lambda x: x[2], reverse=True)
 
@@ -156,15 +187,13 @@ def sort_tickers(treeview, column, reverse):
     column_indices = {
         "Ticker": 0,
         "Company Name": 1,
-        "Correlation Factor": 2,
-        "Sector": 3,
-        "Last Price": 4,
-        "Earnings Date": 5
+        "Correlation": 2,
+        "Current Price": 3,
     }
     col_index = column_indices[column]
 
     items = [(treeview.item(child)['values'], child) for child in treeview.get_children()]
-    if column in ["Correlation Factor", "Last Price"]:
+    if column in ["Correlation", "Current Price"]:
         items.sort(key=lambda x: float(x[0][col_index]), reverse=reverse)
     else:
         items.sort(key=lambda x: x[0][col_index], reverse=reverse)
@@ -184,24 +213,22 @@ def display_tickers(symbol, min_corr_factor):
     frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
     correlated_tickers = filter_tickers(symbol, min_corr_factor)
-    columns = ("Ticker", "Company Name", "Correlation Factor", "Sector", "Last Price", "Earnings Date")
+    columns = ("Ticker", "Company Name", "Correlation", "Current Price")
     tree = ttk.Treeview(frame, columns=columns, show='headings')
 
     column_widths = {
         "Ticker": 50,
         "Company Name": 150,
-        "Correlation Factor": 120,
-        "Sector": 100,
-        "Last Price": 70,
-        "Earnings Date": 100
+        "Correlation": 120,
+        "Current Price": 70,
     }
 
     for col in columns:
         tree.heading(col, text=col, command=lambda _col=col: sort_tickers(tree, _col, False))
         tree.column(col, width=column_widths[col])
 
-    for ticker, company_name, corr_factor, sector, last_price, earnings_date in correlated_tickers:
-        tree.insert("", tk.END, values=(ticker, company_name, f"{corr_factor:.2f}", sector, f"{last_price:.2f}", earnings_date))
+    for ticker, company_name, corr_factor, current_price in correlated_tickers:
+        tree.insert("", tk.END, values=(ticker, company_name, f"{corr_factor:.2f}", f"{current_price:.2f}"))
 
     tree.pack(expand=True, fill=tk.BOTH)
     root.mainloop()
