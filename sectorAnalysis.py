@@ -76,20 +76,18 @@ def add_labels(ax):
                         ha='center', va='center', fontsize=10, color='black', xytext=(0, -10),
                         textcoords='offset points')
 
-def plot_graphs(figNum, df, criteria, yLabel, saveFileName):
-    plt.figure(figNum, figsize=(10, 6))
+def plot_graphs(figNum, df, criteria, yLabel):
+    plt.figure(figNum, figsize=(7.5, 4.5))
     ax = df.sort_values(by=criteria, ascending=False).plot(kind='bar', legend=False, ax=plt.gca())
-    plt.title('Sector ' + criteria + ' Over the Last Month')
+    plt.title(f'Sector {criteria} Over the Last Month')
     plt.ylabel(yLabel)
     plt.xlabel('Sector')
     plt.xticks(rotation=45)
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     add_labels(ax)
 
-    plt.tight_layout()
-    #plt.savefig(saveFileName)
+if __name__ == "__main__":
+    plot_graphs(1, performance_df, 'Performance', 'Average Percentage Change')
+    plot_graphs(2, volume_df, 'Volume Change', 'Average Volume Percentage Change')
+    plot_graphs(3, sum_price_df, 'Stock Price Change', 'Stock Prices Percentage Change')
     plt.show()
-
-plot_graphs(1, performance_df, 'Performance', 'Average Percentage Change', 'sector_performance.png')
-plot_graphs(2, volume_df, 'Volume Change', 'Average Volume Percentage Change', 'sector_volume_change.png')
-plot_graphs(3, sum_price_df, 'Stock Price Change', 'Stock Prices Percentage Change', 'sum_price_change.png')

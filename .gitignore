@@ -3,3 +3,4 @@ operatingdollars.py
 pricedata.py
 quarteroverquarter_revenue.py
 yearoveryear_revenue.py
+__pycache__/

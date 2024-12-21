@@ -4,7 +4,7 @@ TECHNOLOGY_COMPANIES = [
     'DDOG', 'PINS', 'AMZN', 'META', 'CSCO', 'ORCL', 'ANET', 'PANW', 'DLTR', 'HPQ',
     'CRWD', 'MDB', 'GTLB', 'SQ', 'ZM', 'PYPL', 'RBLX', 'CFLT', 'ADSK', 'KEYS', 'NOW',
     'SOFI', 'RIVN', 'QS', 'TEAM', 'ROKU', 'AFRM', 'MNDY', 'GOOGL', 'MSFT', 'AAPL',
-    'INTC', 'BABA', 'PLTR', 'COST', 'SNOW', 'FSLY', 'TGTX', 'HUBS'
+    'INTC', 'BABA', 'PLTR', 'COST', 'SNOW', 'TGTX', 'HUBS'
 ]
 
 # Semiconductor Companies
@@ -31,7 +31,7 @@ HEALTHCARE_COMPANIES = [
 
 # Financial Companies
 FINANCIAL_COMPANIES = [
-    'JPM', 'BAC', 'WFC', 'C', 'GS', 'V', 'MA', 'AXP', 'MS', 'BK'
+    'JPM', 'BAC', 'C', 'GS', 'V', 'MA', 'AXP', 'MS', 'BK'
 ]
 
 # Consumer Staples Companies
@@ -101,6 +101,6 @@ ALL_TICKERS = sorted(list(set([
     'SYY', 'T', 'TAP', 'TDG', 'TEL', 'TFC', 'TFX', 'TGT', 'THC', 'TJX', 'TMUS',
     'TMO', 'TRIP', 'TROW', 'TRV', 'TSCO', 'TSLA', 'TTWO', 'TXN', 'UNH', 'UNP',
     'UPS', 'URBN', 'USB', 'V', 'VFC', 'VLO', 'VMC', 'VNO', 'VRSN', 'VZ', 'WBA',
-    'WBD', 'WDC', 'WELL', 'WFC', 'WMT', 'WRB', 'WST', 'WU', 'WYNN', 'XEL',
+    'WBD', 'WDC', 'WELL', 'WMT', 'WRB', 'WST', 'WU', 'WYNN', 'XEL',
     'XOM', 'XPO', 'YUM', 'ZBH', 'ZBRA', 'ZION', 'ZTS'
     ] + MY_TICKERS)))

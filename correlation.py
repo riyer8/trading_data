@@ -2,7 +2,7 @@ from datetime import date
 import tkinter as tk
 from tkinter import ttk
 import yfinance as yf
-from portfolioInfo import PYPL_TICKERS
+from portfolioInfo import MY_TICKERS
 from scipy.stats import pearsonr
 
 CORRELATION_WEIGHTS = {
@@ -170,17 +170,34 @@ def correlation_factor(target_info, compare_info, target_ticker, compare_ticker)
     return weighted_sum / sum(CORRELATION_WEIGHTS.values())
 
 def filter_tickers(symbol, min_corr_factor):
-    _, target_info = ticker_data(symbol)
+    """Filter tickers based on correlation factor and retrieve additional details."""
+    try:
+        # Fetch data for the target symbol
+        target_history, target_info = ticker_data(symbol)
+    except Exception as e:
+        print(f"Error fetching data for target symbol {symbol}: {e}")
+        return []
+
     filtered_tickers = []
 
-    for ticker in PYPL_TICKERS:
-        _, compare_info = ticker_data(ticker)
-        corr_factor = correlation_factor(target_info, compare_info, symbol, ticker)
-        if corr_factor >= min_corr_factor:
-            company_name = compare_info.get('longName', 'N/A')
-            current_price = compare_info.get('last_price', compare_info.get('currentPrice', 0))  # Fetch current price
-            filtered_tickers.append((ticker, company_name, corr_factor, current_price))
+    for ticker in MY_TICKERS:
+        try:
+            # Fetch data for the compared ticker
+            compare_history, compare_info = ticker_data(ticker)
 
+            # Compute correlation factor (assuming correlation_factor is defined)
+            corr_factor = correlation_factor(target_info, compare_info, symbol, ticker)
+
+            # Check if the correlation factor meets the minimum threshold
+            if corr_factor >= min_corr_factor:
+                company_name = compare_info.get('longName', 'N/A')
+                current_price = compare_info.get('currentPrice', 0)  # Use currentPrice as fallback
+                filtered_tickers.append((ticker, company_name, corr_factor, current_price))
+        except Exception as e:
+            print(f"Error processing ticker {ticker}: {e}")
+            continue
+
+    # Sort filtered tickers by correlation factor in descending order
     return sorted(filtered_tickers, key=lambda x: x[2], reverse=True)
 
 def sort_tickers(treeview, column, reverse):

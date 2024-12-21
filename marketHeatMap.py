@@ -34,10 +34,12 @@ def heat_map(tickers_data):
         row, col = divmod(i, size)
         data[row, col] = percentage
 
-    norm = mcolors.Normalize(vmin=min(percentages), vmax=max(percentages))
-    cmap = plt.get_cmap('coolwarm_r')
+    colors = [(1, 0, 0), (1, 1, 1), (0, 0, 1)]
+    cmap = mcolors.LinearSegmentedColormap.from_list("RedBlue", colors, N=256)
+    
+    norm = mcolors.TwoSlopeNorm(vmin=min(percentages), vcenter=0, vmax=max(percentages))
 
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(6, 6))
     cax = ax.matshow(data, cmap=cmap, norm=norm)
 
     cbar = plt.colorbar(cax)
@@ -45,7 +47,7 @@ def heat_map(tickers_data):
 
     for (i, j), val in np.ndenumerate(data):
         if not np.isnan(val):
-            ax.text(j, i, tickers[i * size + j], ha='center', va='center', fontsize=6, 
+            ax.text(j, i, tickers[i * size + j], ha='center', va='center', fontsize=8, 
                     color='white' if abs(val) > 3 else 'black')
 
     ax.set_xticks([])

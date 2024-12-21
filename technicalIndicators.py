@@ -2,6 +2,7 @@ import pandas as pd
 import tkinter as tk
 from tkinter import ttk
 import yfinance as yf
+import time
 from portfolioInfo import MY_TICKERS
 
 def fetch_all_tickers():
@@ -36,8 +37,28 @@ def get_spx_beta(ticker):
     ticker_obj = yf.Ticker(ticker)
     return ticker_obj.info.get('beta', 'N/A')
 
+def safe_fetch(ticker):
+    retries = 5
+    for attempt in range(retries):
+        try:
+            data = yf.download(ticker, period="6mo", interval="1d")
+            if data.empty:
+                raise ValueError(f"No data returned for {ticker}")
+            return data
+        except Exception as e:
+            if "Too Many Requests" in str(e):
+                print(f"Rate limit exceeded for {ticker}, retrying...")
+                time.sleep(5 * (attempt + 1))
+            else:
+                print(f"Error fetching data for {ticker}: {e}")
+                break
+    return None
+
 def collect_technical_data(ticker):
-    data = yf.download(ticker, period="6mo", interval="1d")
+    data = safe_fetch(ticker)
+    if data is None:
+        return [None] * 6
+
     last_price = data['Close'].iloc[-1]
     rsi = calculate_rsi(data)
     pe_ratio = get_pe_ratio(ticker)
@@ -95,12 +116,20 @@ def create_technical_indicators_screen():
         company_name, sector = get_company_info(ticker)
         last_price, rsi, pe_ratio, ma_50, short_percent_float, spx_beta = collect_technical_data(ticker)
         
-        pe_ratio_display = f"{float(pe_ratio):.2f}" if pe_ratio != 'N/A' else pe_ratio
-        rsi_display = f"{rsi:.2f}"
-        ma_50_display = f"{ma_50:.2f}"
-        last_price_display = f"{last_price:.2f}"
-        short_percent_float_display = f"{short_percent_float:.2%}" if short_percent_float != 'N/A' else short_percent_float
-        spx_beta_display = f"{spx_beta:.2f}" if spx_beta != 'N/A' else spx_beta
+        if last_price is None:
+            last_price_display = "N/A"
+            rsi_display = "N/A"
+            pe_ratio_display = "N/A"
+            ma_50_display = "N/A"
+            short_percent_float_display = "N/A"
+            spx_beta_display = "N/A"
+        else:
+            pe_ratio_display = f"{float(pe_ratio):.2f}" if pe_ratio != 'N/A' else pe_ratio
+            rsi_display = f"{rsi:.2f}"
+            ma_50_display = f"{ma_50:.2f}"
+            last_price_display = f"{last_price:.2f}"
+            short_percent_float_display = f"{short_percent_float:.2%}" if short_percent_float != 'N/A' else short_percent_float
+            spx_beta_display = f"{spx_beta:.2f}" if spx_beta != 'N/A' else spx_beta
 
         tree.insert("", tk.END, values=(ticker, company_name, sector, last_price_display, rsi_display, pe_ratio_display, ma_50_display, short_percent_float_display, spx_beta_display))
 

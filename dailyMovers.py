@@ -1,20 +1,28 @@
 import tkinter as tk
 from tkinter import ttk
 import yfinance as yf
+import time
 from portfolioInfo import MY_TICKERS, ALL_TICKERS
 from stockChart import main as plot_stock_chart
 import matplotlib.pyplot as plt
 import numpy as np
+import requests
+import json
 
 def all_tickers():
     print(f"Total Number of Tickers: {len(MY_TICKERS)}")
     return sorted(set(MY_TICKERS))
 
 def company_info(ticker):
-    ticker = yf.Ticker(ticker)
-    company_name = ticker.info.get('longName', 'N/A')
-    sector = ticker.info.get('sector', 'N/A')
-    return company_name, sector
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        company_name = ticker_obj.info.get('longName', 'N/A')
+        sector = ticker_obj.info.get('sector', 'N/A')
+        return company_name, sector
+    except (json.decoder.JSONDecodeError, requests.exceptions.RequestException) as e:
+        print(f"Error fetching data for {ticker}: {e}")
+        time.sleep(3)
+        return 'N/A', 'N/A'
 
 def calculate_percentage_change(data):
     last_close = data['Close'].iloc[-2]
@@ -49,6 +57,7 @@ def string_to_volume(volume_str):
         return float(volume_str)
 
 def collect_data(ticker):
+    time.sleep(1)
     data = yf.download(ticker, period="5d", interval="1d")
 
     last_price = data['Close'].iloc[-1]
@@ -103,45 +112,6 @@ def on_ticker_double_click(event, tree):
     ticker = tree.item(item, 'values')[0]
     plot_stock_chart(ticker, 6)
 
-def plot_percent_changes_and_volumes(top_moving_tickers):
-    fig1, ax1 = plt.subplots(figsize=(10, 6))
-    color_map = plt.cm.get_cmap('tab10', len(top_moving_tickers))
-
-    for i, (ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change, stock_data) in enumerate(top_moving_tickers):
-        dates = stock_data.index
-        percent_changes = stock_data['Close'].pct_change() * 100
-
-        if ticker == 'PYPL':
-            ax1.plot(dates, percent_changes, label=ticker, color=color_map(i), linewidth=3)  # Thicker line for PYPL
-        else:
-            ax1.plot(dates, percent_changes, label=ticker, color=color_map(i), linewidth=1.5)
-
-    ax1.set_title("Percent Change Over Time", fontsize=14)
-    ax1.set_xlabel("Date", fontsize=12)
-    ax1.set_ylabel("Percent Change (%)", fontsize=12)
-    ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-    ax1.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Tickers")
-    plt.tight_layout()
-
-    plt.figure(fig1.number)
-    plt.show()
-
-    fig2, ax2 = plt.subplots(figsize=(10, 6))
-    for i, (ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change, stock_data) in enumerate(top_moving_tickers):
-        dates = stock_data.index
-        volumes = stock_data['Volume']
-    ax2.plot(dates, volumes, label=ticker, color=color_map(i), linewidth=1.5)
-
-    ax2.set_title("Volume Over Time", fontsize=14)
-    ax2.set_xlabel("Date", fontsize=12)
-    ax2.set_ylabel("Volume", fontsize=12)
-    ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-    ax2.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Tickers")
-    plt.tight_layout()
-
-    plt.figure(fig2.number)
-    plt.show()
-
 def display_tickers():
     root = tk.Tk()
     root.title("Top Moving Tickers")
@@ -172,10 +142,6 @@ def display_tickers():
         tree.insert("", tk.END, values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", volume_to_string(volume), f"{volume_change:.2f}"), tags=(tag,))
 
     tree.pack(expand=True, fill=tk.BOTH)
-
-    # Add a button to plot the percent changes and volumes
-    plot_button = tk.Button(root, text="Plot Percent Changes and Volumes", command=lambda: plot_percent_changes_and_volumes(top_moving_tickers))
-    plot_button.pack(pady=10)
 
     root.mainloop()
 

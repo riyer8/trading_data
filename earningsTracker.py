@@ -1,7 +1,7 @@
+import yfinance as yf
 from datetime import date
 import tkinter as tk
 from tkinter import ttk
-import yfinance as yf
 from portfolioInfo import MY_TICKERS
 
 def all_tickers():
@@ -9,27 +9,36 @@ def all_tickers():
     return sorted(set(MY_TICKERS))
 
 def company_info(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    company_name = ticker_obj.info.get('longName', 'N/A')
-    sector = ticker_obj.info.get('sector', 'N/A')
-    return company_name, sector
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        info = ticker_obj.info
+        company_name = info.get('longName', 'N/A')
+        sector = info.get('sector', 'N/A')
+        return company_name, sector
+    except Exception as e:
+        print(f"Error fetching data for {ticker}: {e}")
+        return 'N/A', 'N/A'
 
 def find_next_earnings(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    today_date = date.today()
-    calendar = ticker_obj.calendar
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        today_date = date.today()
+        calendar = ticker_obj.calendar
 
-    if len(calendar['Earnings Date']) == 0:
-        return 'N/A'
-    
-    next_earnings = calendar['Earnings Date'][0]
-    
-    if next_earnings < today_date:
-        if len(calendar['Earnings Date']) < 2:
+        if 'Earnings Date' not in calendar or len(calendar['Earnings Date']) == 0:
             return 'N/A'
-        return calendar['Earnings Date'][1]
-    
-    return next_earnings
+
+        next_earnings = calendar['Earnings Date'][0]
+
+        if next_earnings < today_date:
+            if len(calendar['Earnings Date']) < 2:
+                return 'N/A'
+            return calendar['Earnings Date'][1]
+        
+        return next_earnings
+    except Exception as e:
+        print(f"Error fetching earnings for {ticker}: {e}")
+        return 'N/A'
 
 def filter_tickers():
     tickers = all_tickers()
