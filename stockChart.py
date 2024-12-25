@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.widgets import RectangleSelector
+import sys
 
 def fetch_stock_history(ticker):
     stock = yf.Ticker(ticker)
@@ -118,17 +119,14 @@ def main(ticker, lookback_months):
     plt.show()
 
 if __name__ == "__main__":
-    while True:
-        ticker_symbol = input("Enter the stock ticker symbol (or 'exit' to stop): ").strip()
-        if ticker_symbol.lower() == "exit":
-            break
-        if not ticker_symbol:
-            print("Ticker symbol cannot be empty.")
-            continue
-
+    if len(sys.argv) < 3:
+        ticker_symbol = input("Enter the stock ticker symbol (e.g., AAPL): ").strip()
         lookback_time = input("Enter the lookback period in months: ").strip()
-        if not lookback_time.isdigit():
-            print("Lookback period must be a valid number.")
-            continue
-
+    else:
+        ticker_symbol = sys.argv[1]
+        lookback_time = sys.argv[2]
+    
+    if not lookback_time.isdigit():
+        print("Lookback period must be a valid number.")
+    else:
         main(ticker_symbol, lookback_time)

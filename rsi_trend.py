@@ -1,6 +1,7 @@
 import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
+import sys
 
 def calculate_rsi(data, period=14):
     """Calculate the Relative Strength Index (RSI)."""
@@ -59,5 +60,9 @@ def plot_rsi(ticker):
     plt.show()
 
 if __name__ == "__main__":
-    ticker_input = input("Enter a valid stock ticker symbol: ")
+    if len(sys.argv) < 2:
+        ticker_input = input("Enter a valid stock ticker symbol: ")
+    else:
+        ticker_input = sys.argv[1]
+    
     plot_rsi(ticker_input)

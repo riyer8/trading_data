@@ -57,16 +57,24 @@ def string_to_volume(volume_str):
         return float(volume_str)
 
 def collect_data(ticker):
-    time.sleep(1)
-    data = yf.download(ticker, period="5d", interval="1d")
-
-    last_price = data['Close'].iloc[-1]
-    percentage_change = calculate_percentage_change(data)
-    std_change = calculate_standard_deviation(data)
-    last_volume = data['Volume'].iloc[-1]
-    volume_change = calculate_volume_change(data)
-    
-    return last_price, percentage_change, std_change, last_volume, volume_change, data
+    retries = 3
+    for attempt in range(retries):
+        try:
+            data = yf.download(ticker, period="5d", interval="1d")
+            if not data.empty:
+                last_price = data['Close'].iloc[-1]
+                percentage_change = calculate_percentage_change(data)
+                std_change = calculate_standard_deviation(data)
+                last_volume = data['Volume'].iloc[-1]
+                volume_change = calculate_volume_change(data)
+                return last_price, percentage_change, std_change, last_volume, volume_change, data
+            else:
+                print(f"No data returned for {ticker}.")
+                return None, None, None, None, None, None
+        except Exception as e:
+            print(f"Attempt {attempt+1} failed for {ticker}: {e}")
+            time.sleep(5 * (2 ** attempt))
+    return None, None, None, None, None, None
 
 def filter_tickers():
     tickers = all_tickers()

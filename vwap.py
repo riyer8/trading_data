@@ -1,6 +1,7 @@
 import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
+import sys
 
 def calculate_vwap(data):
     vwap = (data['Close'] * data['Volume']).cumsum() / data['Volume'].cumsum()
@@ -52,12 +53,16 @@ def plot_vwap(ticker, period='1y', interval='1d'):
 
     plt.grid()
     plt.tight_layout()
-    
     plt.show()
+    
     latest_data = data.tail(5)[['Close', 'VWAP']]
     print("\nLatest 5 Closing Prices and VWAP Values:")
     print(latest_data)
 
 if __name__ == "__main__":
-    ticker_symbol = input("Enter the stock ticker symbol (e.g., AAPL): ")
-    plot_vwap(ticker_symbol)
+    if len(sys.argv) < 2:
+        ticker_input = input("Enter a valid stock ticker symbol: ").strip()
+    else:
+        ticker_input = sys.argv[1]
+    
+    plot_vwap(ticker_input)

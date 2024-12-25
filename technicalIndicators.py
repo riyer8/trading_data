@@ -9,10 +9,14 @@ def fetch_all_tickers():
     return sorted(set(MY_TICKERS))
 
 def get_company_info(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    company_name = ticker_obj.info.get('longName', 'N/A')
-    sector = ticker_obj.info.get('sector', 'N/A')
-    return company_name, sector
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        company_name = ticker_obj.info.get('longName', 'N/A')
+        sector = ticker_obj.info.get('sector', 'N/A')
+        return company_name, sector
+    except Exception as e:
+        print(f"Error fetching company info for {ticker}: {e}")
+        return 'N/A', 'N/A'
 
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff(1)
@@ -23,32 +27,45 @@ def calculate_rsi(data, period=14):
     return rsi.iloc[-1]
 
 def get_pe_ratio(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    return ticker_obj.info.get('trailingPE', 'N/A')
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        return ticker_obj.info.get('trailingPE', 'N/A')
+    except Exception as e:
+        print(f"Error fetching P/E ratio for {ticker}: {e}")
+        return 'N/A'
 
 def get_moving_average(data, window=50):
     return data['Close'].rolling(window=window).mean().iloc[-1]
 
 def get_short_percent_float(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    return ticker_obj.info.get('shortPercentFloat', 'N/A')
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        return ticker_obj.info.get('shortPercentFloat', 'N/A')
+    except Exception as e:
+        print(f"Error fetching short percent float for {ticker}: {e}")
+        return 'N/A'
 
 def get_spx_beta(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    return ticker_obj.info.get('beta', 'N/A')
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        return ticker_obj.info.get('beta', 'N/A')
+    except Exception as e:
+        print(f"Error fetching SPX beta for {ticker}: {e}")
+        return 'N/A'
 
 def safe_fetch(ticker):
-    retries = 5
+    retries = 10  # Increased retry count
     for attempt in range(retries):
         try:
+            print(f"Fetching data for {ticker}, attempt {attempt + 1}")
             data = yf.download(ticker, period="6mo", interval="1d")
             if data.empty:
                 raise ValueError(f"No data returned for {ticker}")
             return data
         except Exception as e:
             if "Too Many Requests" in str(e):
-                print(f"Rate limit exceeded for {ticker}, retrying...")
-                time.sleep(5 * (attempt + 1))
+                print(f"Rate limit exceeded for {ticker}, retrying in {10 * (attempt + 1)} seconds...")
+                time.sleep(10 * (attempt + 1))  # Increased retry delay
             else:
                 print(f"Error fetching data for {ticker}: {e}")
                 break
