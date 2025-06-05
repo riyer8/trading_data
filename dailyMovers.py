@@ -82,7 +82,7 @@ def filter_tickers():
 
     for ticker in tickers:
         last_price, percentage_change, std_dev, volume, volume_change, stock_data = collect_data(ticker)
-        if last_price >= 10:
+        if type(last_price) == int and last_price >= 10:
             company_name, sector = company_info(ticker)
             data.append((ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change, stock_data))
 
