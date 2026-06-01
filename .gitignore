@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# Shared market-data cache (temporary, regenerated on demand)
+.datacache/
+
 # Virtual environment
 .venv/
 

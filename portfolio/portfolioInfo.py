@@ -2,7 +2,7 @@
 TECHNOLOGY_COMPANIES = [
     'AMD', 'IBM', 'CRM', 'HPE', 'DELL', 'ADBE', 'AI', 'SHOP', 'TWLO', 'SPOT', 'Z',
     'DDOG', 'PINS', 'AMZN', 'META', 'CSCO', 'ORCL', 'ANET', 'PANW', 'DLTR', 'HPQ',
-    'CRWD', 'MDB', 'GTLB', 'SQ', 'ZM', 'PYPL', 'RBLX', 'CFLT', 'ADSK', 'KEYS', 'NOW',
+    'CRWD', 'MDB', 'GTLB', 'XYZ', 'ZM', 'PYPL', 'RBLX', 'ADSK', 'KEYS', 'NOW',
     'SOFI', 'RIVN', 'QS', 'TEAM', 'ROKU', 'AFRM', 'MNDY', 'GOOGL', 'MSFT', 'AAPL',
     'INTC', 'BABA', 'PLTR', 'COST', 'SNOW', 'TGTX', 'HUBS'
 ]
@@ -102,5 +102,18 @@ ALL_TICKERS = sorted(list(set([
     'TMO', 'TRIP', 'TROW', 'TRV', 'TSCO', 'TSLA', 'TTWO', 'TXN', 'UNH', 'UNP',
     'UPS', 'URBN', 'USB', 'V', 'VFC', 'VLO', 'VMC', 'VNO', 'VRSN', 'VZ', 'WBA',
     'WBD', 'WDC', 'WELL', 'WMT', 'WRB', 'WST', 'WU', 'WYNN', 'XEL',
-    'XOM', 'XPO', 'YUM', 'ZBH', 'ZBRA', 'ZION', 'ZTS'
+    'XOM', 'XPO', 'YUM', 'ZBH', 'ZBRA', 'ZION', 'ZTS',
+
+    # Additional widely-watched names: mega-caps, high-volume growth/internet,
+    # semis, financials, industrials, energy, autos/EVs, and key index ETFs.
+    'BRK-B', 'GOOG', 'TSM', 'ABT', 'ADI', 'ABNB', 'ARM', 'BX', 'BIDU',
+    'CARR', 'COIN', 'CVNA', 'DASH', 'DE', 'DKNG', 'DOCU', 'EA', 'ELV',
+    'EOG', 'FTNT', 'GEHC', 'GEV', 'GM', 'HON', 'HOOD', 'JD', 'KDP', 'KKR',
+    'KLAC', 'LCID', 'LI', 'LNG', 'LYFT', 'MELI', 'MPC', 'MPWR', 'MRVL',
+    'NET', 'NIO', 'NXPI', 'OKTA', 'OTIS', 'PCAR', 'PDD', 'REGN', 'RKLB',
+    'RTX', 'SE', 'SNAP', 'STLA', 'TER', 'UBER', 'VRTX', 'WDAY', 'WFC',
+    'WMB', 'XPEV', 'ZS',
+
+    # Major index / sector ETFs worth monitoring alongside single names.
+    'SPY', 'QQQ', 'IWM', 'DIA',
     ] + MY_TICKERS)))

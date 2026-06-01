@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import date
 import tkinter as tk
 from tkinter import ttk
-import yfinance as yf
+import datacache
 from portfolio.portfolioInfo import MY_TICKERS
 from scipy.stats import pearsonr
 from ui.theme import Colors, style_table, apply_row_stripes
@@ -27,8 +27,7 @@ CORRELATION_WEIGHTS = {
 }
 
 def ticker_data(ticker):
-    ticker_obj = yf.Ticker(ticker)
-    return ticker_obj.history(period="1y"), ticker_obj.info
+    return datacache.ticker_history(ticker, period="1y"), datacache.ticker_info(ticker)
 
 def sector_similarity(target_info, compare_info):
     if target_info.get('sector') == compare_info.get('sector'):

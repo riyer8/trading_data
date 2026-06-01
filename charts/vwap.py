@@ -2,10 +2,10 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
 
+import datacache
 from ui.theme import Colors, Fonts, apply_chart_theme, style_legend, value_tag, set_window_title
 
 
@@ -15,7 +15,7 @@ def calculate_vwap(data):
 
 
 def plot_vwap(ticker, period='1y', interval='1d'):
-    data = yf.download(ticker, period=period, interval=interval)
+    data = datacache.download(ticker, period=period, interval=interval)
 
     # Recent yfinance returns MultiIndex columns (field, ticker); flatten to a single level.
     if isinstance(data.columns, pd.MultiIndex):

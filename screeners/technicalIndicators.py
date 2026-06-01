@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
 import tkinter as tk
 from tkinter import ttk
-import yfinance as yf
+import datacache
 import time
 from portfolio.portfolioInfo import MY_TICKERS
 from ui.theme import Colors, style_table, apply_row_stripes
@@ -15,9 +15,9 @@ def fetch_all_tickers():
 
 def get_company_info(ticker):
     try:
-        ticker_obj = yf.Ticker(ticker)
-        company_name = ticker_obj.info.get('longName', 'N/A')
-        sector = ticker_obj.info.get('sector', 'N/A')
+        info = datacache.ticker_info(ticker)
+        company_name = info.get('longName', 'N/A')
+        sector = info.get('sector', 'N/A')
         return company_name, sector
     except Exception as e:
         print(f"Error fetching company info for {ticker}: {e}")
@@ -33,8 +33,7 @@ def calculate_rsi(data, period=14):
 
 def get_pe_ratio(ticker):
     try:
-        ticker_obj = yf.Ticker(ticker)
-        return ticker_obj.info.get('trailingPE', 'N/A')
+        return datacache.ticker_info(ticker).get('trailingPE', 'N/A')
     except Exception as e:
         print(f"Error fetching P/E ratio for {ticker}: {e}")
         return 'N/A'
@@ -44,16 +43,14 @@ def get_moving_average(data, window=50):
 
 def get_short_percent_float(ticker):
     try:
-        ticker_obj = yf.Ticker(ticker)
-        return ticker_obj.info.get('shortPercentFloat', 'N/A')
+        return datacache.ticker_info(ticker).get('shortPercentFloat', 'N/A')
     except Exception as e:
         print(f"Error fetching short percent float for {ticker}: {e}")
         return 'N/A'
 
 def get_spx_beta(ticker):
     try:
-        ticker_obj = yf.Ticker(ticker)
-        return ticker_obj.info.get('beta', 'N/A')
+        return datacache.ticker_info(ticker).get('beta', 'N/A')
     except Exception as e:
         print(f"Error fetching SPX beta for {ticker}: {e}")
         return 'N/A'
@@ -63,7 +60,7 @@ def safe_fetch(ticker):
     for attempt in range(retries):
         try:
             print(f"Fetching data for {ticker}, attempt {attempt + 1}")
-            data = yf.download(ticker, period="6mo", interval="1d")
+            data = datacache.download(ticker, period="6mo", interval="1d")
             if data.empty:
                 raise ValueError(f"No data returned for {ticker}")
             return data

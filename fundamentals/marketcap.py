@@ -2,15 +2,14 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
+import datacache
 import matplotlib.pyplot as plt
 from portfolio.portfolioInfo import MY_TICKERS
 from ui.theme import Colors, apply_chart_theme, moving_average_colors, style_legend, set_window_title
 
 def get_historical_market_cap(ticker, start_date, end_date):
-    stock = yf.Ticker(ticker)
-    history = stock.history(start=start_date, end=end_date)
-    market_cap = history['Close'] * stock.info['sharesOutstanding']
+    history = datacache.ticker_history(ticker, start=start_date, end=end_date)
+    market_cap = history['Close'] * datacache.ticker_info(ticker)['sharesOutstanding']
     return market_cap
 
 def compare_market_caps(tickers, start_date, end_date):

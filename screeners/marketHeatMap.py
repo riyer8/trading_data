@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-import yfinance as yf
+import datacache
 from portfolio.portfolioInfo import MY_TICKERS
 from ui.theme import Colors, Fonts, apply_chart_theme, set_window_title
 
@@ -22,7 +22,7 @@ def top_moving_tickers():
     metrics = []
 
     for ticker in tickers:
-        data = yf.download(ticker, period="5d", interval="1d")
+        data = datacache.download(ticker, period="5d", interval="1d")
         percentage_change = calculate_percentage_change(data)
         metrics.append((ticker, percentage_change))
 

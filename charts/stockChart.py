@@ -2,18 +2,17 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
 import mplfinance as mpf
 import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.widgets import RectangleSelector
 
+import datacache
 from ui.theme import Colors, candlestick_style, moving_average_colors, style_legend, set_window_title
 
 def fetch_stock_history(ticker):
-    stock = yf.Ticker(ticker)
-    return stock.history(period="max")
+    return datacache.ticker_history(ticker, period="max")
 
 def filter_data_by_lookback(stock_history, lookback_months):
     end_date = datetime.today().date()

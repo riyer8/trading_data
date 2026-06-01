@@ -4,8 +4,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import tkinter as tk
 from tkinter import ttk
-import yfinance as yf
+import pandas as pd
 import time
+import datacache
 from portfolio.portfolioInfo import MY_TICKERS, ALL_TICKERS
 from charts.stockChart import main as plot_stock_chart
 from ui.theme import Colors, style_table, apply_row_stripes
@@ -20,9 +21,9 @@ def all_tickers():
 
 def company_info(ticker):
     try:
-        ticker_obj = yf.Ticker(ticker)
-        company_name = ticker_obj.info.get('longName', 'N/A')
-        sector = ticker_obj.info.get('sector', 'N/A')
+        info = datacache.ticker_info(ticker)
+        company_name = info.get('longName', 'N/A')
+        sector = info.get('sector', 'N/A')
         return company_name, sector
     except (json.decoder.JSONDecodeError, requests.exceptions.RequestException) as e:
         print(f"Error fetching data for {ticker}: {e}")
@@ -65,7 +66,11 @@ def collect_data(ticker):
     retries = 3
     for attempt in range(retries):
         try:
-            data = yf.download(ticker, period="5d", interval="1d")
+            data = datacache.download(ticker, period="5d", interval="1d")
+            # Recent yfinance returns MultiIndex columns (field, ticker); flatten
+            # so data['Close'].iloc[-1] is a scalar instead of a Series.
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.get_level_values(0)
             if not data.empty:
                 last_price = data['Close'].iloc[-1]
                 percentage_change = calculate_percentage_change(data)
@@ -87,7 +92,10 @@ def filter_tickers():
 
     for ticker in tickers:
         last_price, percentage_change, std_dev, volume, volume_change, stock_data = collect_data(ticker)
-        if type(last_price) == int and last_price >= 10:
+        # Keep any ticker that returned a usable price >= $10. The previous
+        # check (type(last_price) == int) was always False since prices are
+        # floats, so the table came back empty.
+        if last_price is not None and float(last_price) >= 10:
             company_name, sector = company_info(ticker)
             data.append((ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change, stock_data))
 
@@ -121,10 +129,26 @@ def sort_tickers(treeview, column, reverse):
     treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_tickers(treeview, column, not reverse))
     apply_row_stripes(treeview)
 
+_chart_opening = False
+
 def on_ticker_double_click(event, tree):
-    item = tree.selection()[0]
-    ticker = tree.item(item, 'values')[0]
-    plot_stock_chart(ticker, 6)
+    # plt.show() spins matplotlib's own Tk event loop, which can dispatch a
+    # second buffered double-click and re-enter this handler -> two charts.
+    # Guard against re-entry while a chart is already opening.
+    global _chart_opening
+    if _chart_opening:
+        return
+
+    row_id = tree.identify_row(event.y)
+    if not row_id:
+        return
+
+    ticker = tree.item(row_id, 'values')[0]
+    _chart_opening = True
+    try:
+        plot_stock_chart(ticker, 6)
+    finally:
+        _chart_opening = False
 
 def display_tickers():
     root = tk.Tk()

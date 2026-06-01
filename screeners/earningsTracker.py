@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
+import datacache
 from datetime import date
 import tkinter as tk
 from tkinter import ttk
@@ -15,8 +15,7 @@ def all_tickers():
 
 def company_info(ticker):
     try:
-        ticker_obj = yf.Ticker(ticker)
-        info = ticker_obj.info
+        info = datacache.ticker_info(ticker)
         company_name = info.get('longName', 'N/A')
         sector = info.get('sector', 'N/A')
         return company_name, sector
@@ -26,9 +25,8 @@ def company_info(ticker):
 
 def find_next_earnings(ticker):
     try:
-        ticker_obj = yf.Ticker(ticker)
         today_date = date.today()
-        calendar = ticker_obj.calendar
+        calendar = datacache.ticker_calendar(ticker)
 
         if 'Earnings Date' not in calendar or len(calendar['Earnings Date']) == 0:
             return 'N/A'

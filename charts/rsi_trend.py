@@ -2,10 +2,10 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
 
+import datacache
 from ui.theme import Colors, Fonts, apply_chart_theme, style_legend, value_tag, set_window_title
 
 
@@ -22,7 +22,7 @@ def calculate_rsi(data, period=14):
 
 def plot_rsi(ticker):
     """Plot the closing prices and RSI for a given ticker."""
-    data = yf.download(ticker, start="2024-01-01", end="2024-12-31")
+    data = datacache.download(ticker, start="2024-01-01", end="2024-12-31")
 
     # Recent yfinance returns MultiIndex columns (field, ticker); flatten to a single level.
     if isinstance(data.columns, pd.MultiIndex):

@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import tkinter as tk
 from tksheet import Sheet
-import yfinance as yf
+import datacache
 import time
 import numpy as np
 from screeners.correlation import filter_tickers
@@ -13,9 +13,8 @@ from ui.theme import Colors, style_sheet
 def fetch_ticker_data_with_retry(ticker, retries=5, delay=2):
     for attempt in range(retries):
         try:
-            ticker_obj = yf.Ticker(ticker)
-            history = ticker_obj.history(period="1y")
-            info = ticker_obj.info
+            history = datacache.ticker_history(ticker, period="1y")
+            info = datacache.ticker_info(ticker)
             return history, info
         except Exception as e:
             print(f"Attempt {attempt + 1} failed for {ticker}: {e}")

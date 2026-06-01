@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
+import datacache
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
@@ -35,7 +35,7 @@ def calculate_sector_performance(tickers):
     end_date = datetime.now()
     start_date = end_date - timedelta(days=30)
     
-    data = yf.download(tickers, start=start_date, end=end_date)
+    data = datacache.download(tickers, start=start_date, end=end_date)
     
     adj_close = data['Adj Close'].copy()
     volume = data['Volume'].copy()

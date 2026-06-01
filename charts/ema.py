@@ -2,10 +2,10 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
 
+import datacache
 from ui.theme import Colors, apply_chart_theme, moving_average_colors, style_legend, value_tag, set_window_title
 
 START_DATE = "2024-01-01"
@@ -17,7 +17,7 @@ def calculate_ema(data, period):
 
 
 def plot_ema(ticker):
-    data = yf.download(ticker, start=START_DATE, end=END_DATE)
+    data = datacache.download(ticker, start=START_DATE, end=END_DATE)
 
     # Recent yfinance returns MultiIndex columns (field, ticker); flatten to a single level.
     if isinstance(data.columns, pd.MultiIndex):
