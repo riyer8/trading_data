@@ -1,0 +1,7 @@
+yfinance
+matplotlib
+mplfinance
+pandas
+numpy
+scipy
+tksheet

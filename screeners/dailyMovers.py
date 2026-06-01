@@ -1,9 +1,13 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import tkinter as tk
 from tkinter import ttk
 import yfinance as yf
 import time
-from portfolioInfo import MY_TICKERS, ALL_TICKERS
-from stockChart import main as plot_stock_chart
+from portfolio.portfolioInfo import MY_TICKERS, ALL_TICKERS
+from charts.stockChart import main as plot_stock_chart
 import matplotlib.pyplot as plt
 import numpy as np
 import requests

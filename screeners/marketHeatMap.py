@@ -1,8 +1,12 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import yfinance as yf
-from portfolioInfo import MY_TICKERS
+from portfolio.portfolioInfo import MY_TICKERS
 
 def all_tickers():
     return sorted(set(MY_TICKERS))

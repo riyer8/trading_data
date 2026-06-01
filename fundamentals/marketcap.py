@@ -1,6 +1,10 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import yfinance as yf
 import matplotlib.pyplot as plt
-from portfolioInfo import MY_TICKERS
+from portfolio.portfolioInfo import MY_TICKERS
 
 def get_historical_market_cap(ticker, start_date, end_date):
     stock = yf.Ticker(ticker)

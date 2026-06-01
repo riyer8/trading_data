@@ -1,8 +1,12 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import yfinance as yf
 from datetime import date
 import tkinter as tk
 from tkinter import ttk
-from portfolioInfo import MY_TICKERS
+from portfolio.portfolioInfo import MY_TICKERS
 
 def all_tickers():
     print(f"Total Number of Tickers: {len(MY_TICKERS)}")

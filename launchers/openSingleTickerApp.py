@@ -1,8 +1,11 @@
+import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import multiprocessing
-from vwap import plot_vwap
-from rsi_trend import plot_rsi
-from stockChart import main as plot_stock_chart
+from charts.vwap import plot_vwap
+from charts.rsi_trend import plot_rsi
+from charts.stockChart import main as plot_stock_chart
 
 def run_vwap(ticker):
     plot_vwap(ticker)

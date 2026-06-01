@@ -1,7 +1,16 @@
-eps.py
-operatingdollars.py
-pricedata.py
-quarteroverquarter_revenue.py
-yearoveryear_revenue.py
+# Python caches
 __pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+
+# Editor / Code Runner scratch files
 tempCodeRunnerFile.py
+
+# Experimental / personal scratch scripts (kept locally, not versioned)
+experiments/pricedata.py
+fundamentals/eps.py
+fundamentals/operatingdollars.py
+fundamentals/quarteroverquarter_revenue.py
+fundamentals/yearoveryear_revenue.py

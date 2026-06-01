@@ -1,8 +1,12 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from datetime import date
 import tkinter as tk
 from tkinter import ttk
 import yfinance as yf
-from portfolioInfo import MY_TICKERS
+from portfolio.portfolioInfo import MY_TICKERS
 from scipy.stats import pearsonr
 
 CORRELATION_WEIGHTS = {

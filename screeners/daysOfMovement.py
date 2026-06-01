@@ -1,8 +1,13 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import tkinter as tk
 from tksheet import Sheet
 import yfinance as yf
 import time
 import numpy as np
+from screeners.correlation import filter_tickers
 
 def fetch_ticker_data_with_retry(ticker, retries=5, delay=2):
     for attempt in range(retries):

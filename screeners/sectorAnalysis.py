@@ -1,9 +1,13 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
-from portfolioInfo import (
+from portfolio.portfolioInfo import (
     SEMICONDUCTOR_COMPANIES, TECHNOLOGY_COMPANIES, 
     CONSUMER_DISCRETIONARY_COMPANIES, ENERGY_COMPANIES, HEALTHCARE_COMPANIES, 
     FINANCIAL_COMPANIES, CONSUMER_STAPLES_COMPANIES, 

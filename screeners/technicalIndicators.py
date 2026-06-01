@@ -1,9 +1,13 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pandas as pd
 import tkinter as tk
 from tkinter import ttk
 import yfinance as yf
 import time
-from portfolioInfo import MY_TICKERS
+from portfolio.portfolioInfo import MY_TICKERS
 
 def fetch_all_tickers():
     return sorted(set(MY_TICKERS))
