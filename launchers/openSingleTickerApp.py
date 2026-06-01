@@ -17,10 +17,18 @@ def run_stock_chart(ticker, lookback_months):
     plot_stock_chart(ticker, lookback_months)
 
 def run_parallel(tickers, lookback_months):
-    with multiprocessing.Pool(processes=len(tickers)) as pool:
-        pool.starmap(run_vwap, [(ticker,) for ticker in tickers])
-        pool.starmap(run_rsi, [(ticker,) for ticker in tickers])
-        pool.starmap(run_stock_chart, [(ticker, lookback_months) for ticker in tickers])  # Pass lookback_months
+    # Start every chart in its own process so all windows open at once. starmap
+    # would block on each chart's plt.show() and reveal them one at a time.
+    processes = []
+    for ticker in tickers:
+        processes.append(multiprocessing.Process(target=run_vwap, args=(ticker,)))
+        processes.append(multiprocessing.Process(target=run_rsi, args=(ticker,)))
+        processes.append(multiprocessing.Process(target=run_stock_chart, args=(ticker, lookback_months)))
+
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join()
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

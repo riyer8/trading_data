@@ -9,7 +9,15 @@ def calculate_vwap(data):
 
 def plot_vwap(ticker, period='1y', interval='1d'):
     data = yf.download(ticker, period=period, interval=interval)
-    
+
+    # Recent yfinance returns MultiIndex columns (field, ticker); flatten to a single level.
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+
+    if data.empty:
+        print(f"No data found for ticker symbol: {ticker}")
+        return
+
     data['VWAP'] = calculate_vwap(data)
 
     plt.figure(figsize=(6, 3.6))

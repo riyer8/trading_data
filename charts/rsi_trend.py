@@ -16,13 +16,17 @@ def calculate_rsi(data, period=14):
 def annotate_last_value(ax, data, label, color):
     """Annotate the last value on the plot."""
     last_date = data.index[-1]
-    last_value = data[-1]
+    last_value = data.iloc[-1]
     ax.text(last_date, last_value, f'{last_value:.2f}', color=color, 
             fontsize=10, fontweight='bold', verticalalignment='bottom')
 
 def plot_rsi(ticker):
     """Plot the closing prices and RSI for a given ticker."""
     data = yf.download(ticker, start="2024-01-01", end="2024-12-31")
+
+    # Recent yfinance returns MultiIndex columns (field, ticker); flatten to a single level.
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
 
     if data.empty:
         print(f"No data found for ticker symbol: {ticker}")

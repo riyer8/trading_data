@@ -55,53 +55,44 @@ def plot_candlestick_chart(ticker, data, lookback_months, moving_averages, bolli
 
 def setup_zooming(ax, fig):
     original_xlim = ax[0].get_xlim()
-    rectangle_selector = None
+
+    def hide_selection():
+        # Hide the selection box/handles so they don't linger in the new view.
+        rectangle_selector.set_visible(False)
+        rectangle_selector.update()
+        fig.canvas.draw_idle()
 
     def on_select(eclick, erelease):
         start, end = eclick.xdata, erelease.xdata
-        ax[0].set_xlim([start, end])
-        plt.draw()
-        remove_rectangle_selector()
-        create_rectangle_selector()
+        if start is None or end is None:
+            return
+        # A single click reports a near-zero pixel span. matplotlib still fires
+        # onselect once a selection exists, so ignore it here; otherwise we'd
+        # set equal x-limits and jump to a garbage zoomed-out view.
+        if abs(erelease.x - eclick.x) < 5:
+            return
+        ax[0].set_xlim(sorted([start, end]))
+        hide_selection()
 
     def on_double_click(event):
         if event.dblclick:
             ax[0].set_xlim(original_xlim)
-            plt.draw()
-            remove_rectangle_selector()
-            create_rectangle_selector()
+            hide_selection()
 
-    def remove_rectangle_selector():
-        nonlocal rectangle_selector
-        if rectangle_selector is not None:
-            rectangle_selector.disconnect_events()
-            rectangle_selector = None
-            for patch in ax[0].patches:
-                if isinstance(patch, plt.Rectangle):
-                    patch.remove()
-            fig.canvas.draw()
+    rectangle_selector = RectangleSelector(
+        ax[0],
+        on_select,
+        useblit=True,
+        button=[1],
+        minspanx=5, minspany=5,
+        spancoords='pixels',
+        interactive=False,
+        props=dict(edgecolor='green', linestyle='-', linewidth=2,
+                   facecolor='lightgreen', alpha=0.3, fill=True),
+    )
 
-    def create_rectangle_selector():
-        nonlocal rectangle_selector
-        rectangle_selector = RectangleSelector(
-            ax[0], 
-            on_select,
-            useblit=True,
-            button=[1],
-            minspanx=5, minspany=5,
-            spancoords='pixels',
-            interactive=True
-        )
-        rectangle_selector.rectprops = {
-            'edgecolor': 'white', 
-            'linestyle': '-', 
-            'linewidth': 2, 
-            'facecolor': 'none'
-        }
-        rectangle_selector.rectprops['visible'] = True
-
-    create_rectangle_selector()
     fig.canvas.mpl_connect('button_press_event', on_double_click)
+    return rectangle_selector
 
 def main(ticker, lookback_months):
     stock_history = fetch_stock_history(ticker)
@@ -110,7 +101,7 @@ def main(ticker, lookback_months):
     bollinger_upper, bollinger_lower = calculate_bollinger_bands(filtered_data)
 
     fig, ax = plot_candlestick_chart(ticker, filtered_data, lookback_months, moving_averages, bollinger_upper, bollinger_lower)
-    setup_zooming(ax, fig)
+    selector = setup_zooming(ax, fig)
 
     plt.tight_layout()
     fig.subplots_adjust(left=0.08, right=0.92, top=0.9, bottom=0.1)
