@@ -53,7 +53,8 @@ def filter_tickers():
         if next_earnings != 'N/A':
             data.append([ticker, company_name, sector, next_earnings])
 
-    return sorted(data, key=lambda x: x[3], reverse=True)
+    # Sort ascending so the soonest upcoming earnings date is at the top.
+    return sorted(data, key=lambda x: x[3])
 
 def sort_tickers(treeview, column, reverse):
     column_indices = {"Ticker": 0, "Company Name": 1, "Sector": 2, "Upcoming Earnings": 3}

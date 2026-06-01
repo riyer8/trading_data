@@ -46,16 +46,42 @@ def days_percentage_changes(ticker):
         print(f"Error calculating percentage changes for {ticker}: {e}")
         return [0] * 15
 
+def apply_change_highlights(sheet):
+    """Color each % cell green/red based on its sign (re-applied after sorting)."""
+    sheet.dehighlight_all()
+    for i, row in enumerate(sheet.get_sheet_data()):
+        for j, cell in enumerate(row[1:], start=1):
+            try:
+                cell_value = float(str(cell).strip('%'))
+            except ValueError:
+                continue
+            bg = Colors.BULL_FILL if cell_value >= 0 else Colors.BEAR_FILL
+            fg = Colors.BULL if cell_value >= 0 else Colors.BEAR
+            sheet.highlight_cells(row=i, column=j, bg=bg, fg=fg)
+
 def sort_sheet_column(sheet, col_index):
-    data = sheet.get_data()
+    if col_index is None:
+        return
+
+    # get_sheet_data()/set_sheet_data() operate on the whole grid. (get_data()/
+    # set_data() are span-based in tksheet 7.x and error without a span.)
+    data = sheet.get_sheet_data()
+    if not data:
+        return
+
     if col_index == 0:
-        data.sort(key=lambda x: x[0])
+        data.sort(key=lambda row: str(row[0]))
     else:
-        for i in range(len(data)):
-            row_to_sort = data[i][1:]
-            sorted_values = sorted(row_to_sort, key=lambda x: float(x.strip('%')))
-            data[i][1:] = sorted_values
-    sheet.set_data(data)
+        def sort_key(row):
+            try:
+                return float(str(row[col_index]).strip('%'))
+            except (ValueError, IndexError):
+                return float('-inf')
+        # Biggest movers first for the clicked day.
+        data.sort(key=sort_key, reverse=True)
+
+    sheet.set_sheet_data(data, reset_col_positions=False, reset_row_positions=False)
+    apply_change_highlights(sheet)
 
 def get_clicked_column_index(event, sheet):
     x = event.x
@@ -98,15 +124,7 @@ def display_percentage_changes(ticker):
                            "row_height_resize", "double_click_column_resize",
                            "right_click_popup_menu", "copy"))
 
-    for i, row in enumerate(data_matrix):
-        for j, cell in enumerate(row[1:], start=1):
-            try:
-                cell_value = float(cell.strip('%'))
-                color = Colors.BULL_FILL if cell_value >= 0 else Colors.BEAR_FILL
-                fg = Colors.BULL if cell_value >= 0 else Colors.BEAR
-                sheet.highlight_cells(row=i, column=j, bg=color, fg=fg)
-            except ValueError:
-                continue
+    apply_change_highlights(sheet)
 
     initial_width = 60
     for col_index in range(sheet.total_columns()):

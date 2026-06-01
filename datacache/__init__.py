@@ -140,6 +140,20 @@ def ticker_calendar(ticker):
     return calendar
 
 
+def ticker_quarterly_financials(ticker):
+    """Cached wrapper around ``yfinance.Ticker(ticker).quarterly_financials``."""
+    key = "qfin|" + _normalize(ticker)
+    cached = _read(key)
+    if cached is not None:
+        return cached
+
+    import yfinance as yf
+    financials = yf.Ticker(ticker).quarterly_financials
+    if not _is_empty(financials):
+        _write(key, financials)
+    return financials
+
+
 def purge_expired():
     """Delete only cache entries older than the TTL. Returns count removed."""
     removed = 0
@@ -182,6 +196,7 @@ __all__ = [
     "ticker_history",
     "ticker_info",
     "ticker_calendar",
+    "ticker_quarterly_financials",
     "purge_expired",
     "clear_cache",
 ]

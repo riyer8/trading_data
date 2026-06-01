@@ -36,8 +36,13 @@ def calculate_sector_performance(tickers):
     start_date = end_date - timedelta(days=30)
     
     data = datacache.download(tickers, start=start_date, end=end_date)
-    
-    adj_close = data['Adj Close'].copy()
+
+    # Recent yfinance defaults to auto_adjust=True, which drops 'Adj Close'
+    # (the 'Close' column is already adjusted). Fall back to 'Close' if needed.
+    fields = data.columns.get_level_values(0) if isinstance(data.columns, pd.MultiIndex) else data.columns
+    price_field = 'Adj Close' if 'Adj Close' in fields else 'Close'
+
+    adj_close = data[price_field].copy()
     volume = data['Volume'].copy()
     
     adj_close = adj_close.dropna(axis=1)
@@ -78,25 +83,33 @@ def add_labels(ax):
                     fontweight='bold', fontfamily='monospace', color=Colors.TEXT,
                     xytext=(0, offset), textcoords='offset points')
 
-def plot_graphs(figNum, df, criteria, yLabel):
-    apply_chart_theme()
-    fig = plt.figure(figNum, figsize=(8.5, 5))
+def plot_graph(df, criteria, yLabel):
+    fig, ax = plt.subplots(figsize=(8.5, 5))
     set_window_title(fig, f"Sector {criteria}")
     sorted_df = df.sort_values(by=criteria, ascending=False)
     bar_colors = [Colors.BULL if v >= 0 else Colors.BEAR for v in sorted_df[criteria]]
-    ax = sorted_df.plot(kind='bar', legend=False, ax=plt.gca(), color=bar_colors,
-                        edgecolor=Colors.BACKGROUND, width=0.7)
+    sorted_df.plot(kind='bar', legend=False, ax=ax, color=bar_colors,
+                   edgecolor=Colors.BACKGROUND, width=0.7)
     ax.axhline(0, color=Colors.MUTED, linewidth=0.8)
     ax.grid(axis='x', visible=False)
-    plt.title(f'Sector {criteria}  ·  Last Month')
-    plt.ylabel(yLabel)
-    plt.xlabel('Sector')
-    plt.xticks(rotation=45, ha='right')
+    ax.set_title(f'Sector {criteria}  ·  Last Month')
+    ax.set_ylabel(yLabel)
+    ax.set_xlabel('Sector')
+    ax.tick_params(axis='x', rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_ha('right')
     add_labels(ax)
     fig.tight_layout()
+    return fig
+
+def plot_all():
+    apply_chart_theme()
+    # Each metric gets its own window; the single plt.show() below opens them
+    # all at the same time.
+    plot_graph(performance_df, 'Performance', 'Average Percentage Change')
+    plot_graph(volume_df, 'Volume Change', 'Average Volume Percentage Change')
+    plot_graph(sum_price_df, 'Stock Price Change', 'Stock Prices Percentage Change')
 
 if __name__ == "__main__":
-    plot_graphs(1, performance_df, 'Performance', 'Average Percentage Change')
-    plot_graphs(2, volume_df, 'Volume Change', 'Average Volume Percentage Change')
-    plot_graphs(3, sum_price_df, 'Stock Price Change', 'Stock Prices Percentage Change')
+    plot_all()
     plt.show()

@@ -63,6 +63,11 @@ def safe_fetch(ticker):
             data = datacache.download(ticker, period="6mo", interval="1d")
             if data.empty:
                 raise ValueError(f"No data returned for {ticker}")
+            # Recent yfinance returns MultiIndex columns (field, ticker); flatten
+            # so data['Close'] is a Series and the derived RSI/price/MA values
+            # are scalars instead of Series (which break f-string formatting).
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.get_level_values(0)
             return data
         except Exception as e:
             if "Too Many Requests" in str(e):

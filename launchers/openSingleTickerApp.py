@@ -1,34 +1,31 @@
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import subprocess
 
-import multiprocessing
-from charts.vwap import plot_vwap
-from charts.rsi_trend import plot_rsi
-from charts.stockChart import main as plot_stock_chart
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
 
-def run_vwap(ticker):
-    plot_vwap(ticker)
 
-def run_rsi(ticker):
-    plot_rsi(ticker)
+def _launch(module, *args):
+    """Launch a chart module as an independent process (non-blocking)."""
+    subprocess.Popen(
+        [sys.executable, "-m", module, *args],
+        cwd=PROJECT_ROOT,
+    )
 
-def run_stock_chart(ticker, lookback_months):
-    plot_stock_chart(ticker, lookback_months)
 
 def run_parallel(tickers, lookback_months):
-    # Start every chart in its own process so all windows open at once. starmap
-    # would block on each chart's plt.show() and reveal them one at a time.
-    processes = []
+    # Fire off every chart without waiting — each runs in its own Python process
+    # so all windows appear together instead of blocking on plt.show() one at a time.
+    lookback = str(lookback_months)
     for ticker in tickers:
-        processes.append(multiprocessing.Process(target=run_vwap, args=(ticker,)))
-        processes.append(multiprocessing.Process(target=run_rsi, args=(ticker,)))
-        processes.append(multiprocessing.Process(target=run_stock_chart, args=(ticker, lookback_months)))
+        ticker = ticker.strip().upper()
+        if not ticker:
+            continue
+        _launch("charts.vwap", ticker)
+        _launch("charts.rsi_trend", ticker)
+        _launch("charts.stockChart", ticker, lookback)
 
-    for process in processes:
-        process.start()
-    for process in processes:
-        process.join()
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
