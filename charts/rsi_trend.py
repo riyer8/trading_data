@@ -1,24 +1,24 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
-import sys
+
+from ui.theme import Colors, Fonts, apply_chart_theme, style_legend, value_tag, set_window_title
+
 
 def calculate_rsi(data, period=14):
     """Calculate the Relative Strength Index (RSI)."""
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-    
+
     rs = gain / loss
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-def annotate_last_value(ax, data, label, color):
-    """Annotate the last value on the plot."""
-    last_date = data.index[-1]
-    last_value = data.iloc[-1]
-    ax.text(last_date, last_value, f'{last_value:.2f}', color=color, 
-            fontsize=10, fontweight='bold', verticalalignment='bottom')
 
 def plot_rsi(ticker):
     """Plot the closing prices and RSI for a given ticker."""
@@ -34,39 +34,46 @@ def plot_rsi(ticker):
 
     data['RSI'] = calculate_rsi(data)
 
-    # Create figure with two subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    apply_chart_theme()
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=(11, 7.5), sharex=True,
+        gridspec_kw={'height_ratios': [3, 1], 'hspace': 0.08},
+    )
+    set_window_title(fig, f"{ticker.upper()} · Price & RSI")
 
-    # Plot the closing price
-    ax1.plot(data['Close'], label='Closing Price', color='black', linewidth=1.5)
-    annotate_last_value(ax1, data['Close'], 'Closing Price', 'black')
+    # Price panel
+    ax1.plot(data.index, data['Close'], label='Close', color=Colors.ACCENT_4, linewidth=1.6)
+    value_tag(ax1, data.index[-1], data['Close'].iloc[-1], f"{data['Close'].iloc[-1]:,.2f}", Colors.ACCENT_4)
+    ax1.set_title(f"{ticker.upper()}  Closing Price")
+    ax1.set_ylabel("Price (USD)")
+    style_legend(ax1, loc='upper left')
 
-    ax1.set_title(f"{ticker} Closing Prices", fontsize=16)
-    ax1.set_ylabel("Price", fontsize=12)
-    ax1.legend(loc='upper left')
-    ax1.grid(True)
-
-    # Plot the RSI
-    ax2.plot(data['RSI'], label='RSI (14)', color='purple', linewidth=1.5)
-    ax2.axhline(70, color='red', linestyle='--', linewidth=1)
-    ax2.axhline(30, color='green', linestyle='--', linewidth=1)
-    
-    ax2.set_title("Relative Strength Index (RSI)", fontsize=16)
-    ax2.set_ylabel("RSI", fontsize=12)
+    # RSI panel with overbought/oversold zones
+    ax2.plot(data.index, data['RSI'], label='RSI (14)', color=Colors.ACCENT_3, linewidth=1.6)
+    ax2.axhline(70, color=Colors.BEAR, linestyle='--', linewidth=1)
+    ax2.axhline(30, color=Colors.BULL, linestyle='--', linewidth=1)
+    ax2.axhspan(70, 100, color=Colors.BEAR, alpha=0.08)
+    ax2.axhspan(0, 30, color=Colors.BULL, alpha=0.08)
+    ax2.set_title("Relative Strength Index", fontsize=Fonts.SUBTITLE)
+    ax2.set_ylabel("RSI")
     ax2.set_ylim(0, 100)
-    ax2.legend(loc='upper left')
-    ax2.grid(True)
+    ax2.set_yticks([0, 30, 50, 70, 100])
+    ax2.set_xlabel("Date")
+    style_legend(ax2, loc='upper left')
 
-    plt.xticks(rotation=30)
-    plt.xlabel("Date", fontsize=12)
-    plt.tight_layout()
+    last_rsi = data['RSI'].iloc[-1]
+    rsi_color = Colors.BEAR if last_rsi >= 70 else Colors.BULL if last_rsi <= 30 else Colors.ACCENT_3
+    value_tag(ax2, data.index[-1], last_rsi, f"{last_rsi:,.1f}", rsi_color)
 
+    fig.autofmt_xdate(rotation=30)
+    fig.tight_layout()
     plt.show()
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         ticker_input = input("Enter a valid stock ticker symbol: ")
     else:
         ticker_input = sys.argv[1]
-    
+
     plot_rsi(ticker_input)

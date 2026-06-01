@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import yfinance as yf
 from portfolio.portfolioInfo import MY_TICKERS
+from ui.theme import Colors, Fonts, apply_chart_theme, set_window_title
 
 def all_tickers():
     return sorted(set(MY_TICKERS))
@@ -38,26 +39,36 @@ def heat_map(tickers_data):
         row, col = divmod(i, size)
         data[row, col] = percentage
 
-    colors = [(1, 0, 0), (1, 1, 1), (0, 0, 1)]
-    cmap = mcolors.LinearSegmentedColormap.from_list("RedBlue", colors, N=256)
-    
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        "BearBull", [Colors.BEAR, Colors.PANEL, Colors.BULL], N=256
+    )
+
     norm = mcolors.TwoSlopeNorm(vmin=min(percentages), vcenter=0, vmax=max(percentages))
 
-    fig, ax = plt.subplots(figsize=(6, 6))
+    apply_chart_theme()
+    fig, ax = plt.subplots(figsize=(7.5, 7.5))
+    set_window_title(fig, "Market Heat Map")
+    ax.grid(False)
     cax = ax.matshow(data, cmap=cmap, norm=norm)
 
-    cbar = plt.colorbar(cax)
-    cbar.set_label('Percentage Change')
+    cbar = plt.colorbar(cax, fraction=0.046, pad=0.04)
+    cbar.set_label('Daily % Change', color=Colors.MUTED)
+    cbar.ax.tick_params(colors=Colors.MUTED)
+    cbar.outline.set_edgecolor(Colors.GRID)
 
     for (i, j), val in np.ndenumerate(data):
         if not np.isnan(val):
-            ax.text(j, i, tickers[i * size + j], ha='center', va='center', fontsize=8, 
-                    color='white' if abs(val) > 3 else 'black')
+            ax.text(j, i, f"{tickers[i * size + j]}\n{val:+.1f}%",
+                    ha='center', va='center', fontsize=Fonts.TICK, fontweight='bold',
+                    fontfamily='monospace', color=Colors.TEXT)
 
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_title('Percentage Change Heat Map')
-    
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_title('Portfolio Heat Map  ·  Daily % Change', pad=16)
+
+    fig.tight_layout()
     plt.show()
 
 if __name__ == "__main__":

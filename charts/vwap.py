@@ -1,11 +1,18 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
-import sys
+
+from ui.theme import Colors, Fonts, apply_chart_theme, style_legend, value_tag, set_window_title
+
 
 def calculate_vwap(data):
     vwap = (data['Close'] * data['Volume']).cumsum() / data['Volume'].cumsum()
     return vwap
+
 
 def plot_vwap(ticker, period='1y', interval='1d'):
     data = yf.download(ticker, period=period, interval=interval)
@@ -20,57 +27,47 @@ def plot_vwap(ticker, period='1y', interval='1d'):
 
     data['VWAP'] = calculate_vwap(data)
 
-    plt.figure(figsize=(6, 3.6))
-    plt.plot(data.index, data['Close'], label='Close Price', color='blue', linewidth=1.5)
-    plt.plot(data.index, data['VWAP'], label='VWAP', color='orange', linewidth=2)
-    
-    plt.title(f'{ticker} Price and VWAP', fontsize=16)
-    plt.xlabel('Date', fontsize=12)
-    plt.ylabel('Price', fontsize=12)
-    
-    plt.fill_between(data.index, data['Close'], data['VWAP'], where=(data['Close'] > data['VWAP']),
-                     color='green', alpha=0.3, label='Price Above VWAP (Bullish)')
-    plt.fill_between(data.index, data['Close'], data['VWAP'], where=(data['Close'] < data['VWAP']),
-                     color='red', alpha=0.3, label='Price Below VWAP (Bearish)')
+    apply_chart_theme()
+    fig, ax = plt.subplots(figsize=(11, 6))
+    set_window_title(fig, f"{ticker.upper()} · VWAP")
 
-    plt.legend()
-    plt.ylim(data['Close'].min() - 10, data['Close'].max() + 10)
+    ax.plot(data.index, data['Close'], label='Close', color=Colors.TEXT, linewidth=1.6)
+    ax.plot(data.index, data['VWAP'], label='VWAP', color=Colors.ACCENT_2, linewidth=2.0)
+
+    ax.fill_between(data.index, data['Close'], data['VWAP'], where=(data['Close'] > data['VWAP']),
+                    color=Colors.BULL, alpha=0.25, interpolate=True, label='Above VWAP (Bullish)')
+    ax.fill_between(data.index, data['Close'], data['VWAP'], where=(data['Close'] < data['VWAP']),
+                    color=Colors.BEAR, alpha=0.25, interpolate=True, label='Below VWAP (Bearish)')
+
+    ax.set_title(f'{ticker.upper()}  Price vs VWAP')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Price (USD)')
+    ax.margins(x=0.01)
 
     last_price = data['Close'].iloc[-1]
     last_vwap = data['VWAP'].iloc[-1]
-    
-    if last_price > last_vwap:
-        sentiment = "Bullish"
-        plt.annotate(f'Latest Price: {last_price:.2f}\n{sentiment}', 
-                     xy=(data.index[-1], last_price), 
-                     xytext=(data.index[-1], last_price + 10),
-                     arrowprops=dict(facecolor='green', shrink=0.05), 
-                     fontsize=10, color='green')
-    elif last_price < last_vwap:
-        sentiment = "Bearish"
-        plt.annotate(f'Latest Price: {last_price:.2f}\n{sentiment}', 
-                     xy=(data.index[-1], last_price), 
-                     xytext=(data.index[-1], last_price - 10),
-                     arrowprops=dict(facecolor='red', shrink=0.05), 
-                     fontsize=10, color='red')
-    else:
-        plt.annotate(f'Latest Price: {last_price:.2f}\nNeutral', 
-                     xy=(data.index[-1], last_price), 
-                     xytext=(data.index[-1], last_price),
-                     fontsize=10, color='black')
+    sentiment_color = Colors.BULL if last_price >= last_vwap else Colors.BEAR
+    value_tag(ax, data.index[-1], last_price, f'{last_price:,.2f}', sentiment_color)
+    value_tag(ax, data.index[-1], last_vwap, f'{last_vwap:,.2f}', Colors.ACCENT_2)
 
-    plt.grid()
-    plt.tight_layout()
+    sentiment = "BULLISH" if last_price > last_vwap else "BEARISH" if last_price < last_vwap else "NEUTRAL"
+    ax.text(0.01, 0.97, f'{sentiment}', transform=ax.transAxes, ha='left', va='top',
+            fontsize=Fonts.SUBTITLE, fontweight='bold', color=sentiment_color,
+            bbox=dict(boxstyle='round,pad=0.4', facecolor=Colors.HEADER, edgecolor=Colors.GRID))
+
+    style_legend(ax, loc='lower left')
+    fig.tight_layout()
     plt.show()
-    
+
     latest_data = data.tail(5)[['Close', 'VWAP']]
     print("\nLatest 5 Closing Prices and VWAP Values:")
     print(latest_data)
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         ticker_input = input("Enter a valid stock ticker symbol: ").strip()
     else:
         ticker_input = sys.argv[1]
-    
+
     plot_vwap(ticker_input)

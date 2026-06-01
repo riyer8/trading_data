@@ -7,6 +7,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
+from ui.theme import Colors, Fonts, apply_chart_theme, set_window_title
+
 from portfolio.portfolioInfo import (
     SEMICONDUCTOR_COMPANIES, TECHNOLOGY_COMPANIES, 
     CONSUMER_DISCRETIONARY_COMPANIES, ENERGY_COMPANIES, HEALTHCARE_COMPANIES, 
@@ -69,26 +71,29 @@ sum_price_df = pd.DataFrame.from_dict(sector_sum_price_change, orient='index', c
 def add_labels(ax):
     for p in ax.patches:
         height = p.get_height()
-        if height > 0:
-            ax.annotate(f'{height:.2f}%', 
-                        (p.get_x() + p.get_width() / 2., height), 
-                        ha='center', va='center', fontsize=10, color='black', xytext=(0, 5),
-                        textcoords='offset points')
-        else:
-            ax.annotate(f'{height:.2f}%', 
-                        (p.get_x() + p.get_width() / 2., height), 
-                        ha='center', va='center', fontsize=10, color='black', xytext=(0, -10),
-                        textcoords='offset points')
+        offset = 6 if height >= 0 else -12
+        ax.annotate(f'{height:+.2f}%',
+                    (p.get_x() + p.get_width() / 2., height),
+                    ha='center', va='center', fontsize=Fonts.ANNOTATION,
+                    fontweight='bold', fontfamily='monospace', color=Colors.TEXT,
+                    xytext=(0, offset), textcoords='offset points')
 
 def plot_graphs(figNum, df, criteria, yLabel):
-    plt.figure(figNum, figsize=(7.5, 4.5))
-    ax = df.sort_values(by=criteria, ascending=False).plot(kind='bar', legend=False, ax=plt.gca())
-    plt.title(f'Sector {criteria} Over the Last Month')
+    apply_chart_theme()
+    fig = plt.figure(figNum, figsize=(8.5, 5))
+    set_window_title(fig, f"Sector {criteria}")
+    sorted_df = df.sort_values(by=criteria, ascending=False)
+    bar_colors = [Colors.BULL if v >= 0 else Colors.BEAR for v in sorted_df[criteria]]
+    ax = sorted_df.plot(kind='bar', legend=False, ax=plt.gca(), color=bar_colors,
+                        edgecolor=Colors.BACKGROUND, width=0.7)
+    ax.axhline(0, color=Colors.MUTED, linewidth=0.8)
+    ax.grid(axis='x', visible=False)
+    plt.title(f'Sector {criteria}  ·  Last Month')
     plt.ylabel(yLabel)
     plt.xlabel('Sector')
-    plt.xticks(rotation=45)
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.xticks(rotation=45, ha='right')
     add_labels(ax)
+    fig.tight_layout()
 
 if __name__ == "__main__":
     plot_graphs(1, performance_df, 'Performance', 'Average Percentage Change')

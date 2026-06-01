@@ -83,41 +83,41 @@ other tools.
 
 ### `screeners/` — scan the whole list
 
-| File | What it does |
-| --- | --- |
-| `dailyMovers.py` | Ranks your tickers by daily % change with price, volume, and volatility. Double-click a row for a candlestick chart. |
-| `marketHeatMap.py` | Red/blue heat map of 5-day % change across every ticker. |
-| `sectorAnalysis.py` | Bar charts of price and volume performance by sector over the last month. |
-| `technicalIndicators.py` | Sortable table of RSI, P/E, 50-day MA, short interest, and beta for each ticker. |
-| `earningsTracker.py` | Upcoming earnings dates, sortable by ticker, company, sector, or date. |
-| `correlation.py` | Finds tickers most similar to a target symbol using a weighted blend of sector, market cap, beta, volume, liquidity, return correlation, and financial ratios. |
-| `daysOfMovement.py` | Color-coded table of the last 15 days of % moves for a ticker and its peers. |
+| File | What it does | Run it |
+| --- | --- | --- |
+| `dailyMovers.py` | Ranks your tickers by daily % change with price, volume, and volatility. Double-click a row for a candlestick chart. | `python -m screeners.dailyMovers` |
+| `marketHeatMap.py` | Red/blue heat map of 5-day % change across every ticker. | `python -m screeners.marketHeatMap` |
+| `sectorAnalysis.py` | Bar charts of price and volume performance by sector over the last month. | `python -m screeners.sectorAnalysis` |
+| `technicalIndicators.py` | Sortable table of RSI, P/E, 50-day MA, short interest, and beta for each ticker. | `python -m screeners.technicalIndicators` |
+| `earningsTracker.py` | Upcoming earnings dates, sortable by ticker, company, sector, or date. | `python -m screeners.earningsTracker` |
+| `correlation.py` | Finds tickers most similar to a target symbol using a weighted blend of sector, market cap, beta, volume, liquidity, return correlation, and financial ratios. | `python -m screeners.correlation` _(prompts for `AAPL` + min correlation)_ |
+| `daysOfMovement.py` | Color-coded table of the last 15 days of % moves for a ticker and its peers. | `python -m screeners.daysOfMovement` _(prompts for `AAPL`)_ |
 
 ### `charts/` — focus on one ticker
 
-| File | What it does |
-| --- | --- |
-| `stockChart.py` | Interactive candlestick chart with moving averages and Bollinger Bands; drag to zoom, double-click to reset. |
-| `ema.py` | 20 / 50 / 200-day exponential moving averages with the latest values annotated. |
-| `rsi_trend.py` | Closing price plus 14-day RSI with overbought/oversold lines. |
-| `vwap.py` | VWAP vs. close with the gap shaded bullish/bearish. |
+| File | What it does | Run it |
+| --- | --- | --- |
+| `stockChart.py` | Interactive candlestick chart with moving averages and Bollinger Bands; drag to zoom, double-click to reset. | `python -m charts.stockChart AAPL 6` |
+| `ema.py` | 20 / 50 / 200-day exponential moving averages with the latest values annotated. | `python -m charts.ema AAPL` |
+| `rsi_trend.py` | Closing price plus 14-day RSI with overbought/oversold lines. | `python -m charts.rsi_trend AAPL` |
+| `vwap.py` | VWAP vs. close with the gap shaded bullish/bearish. | `python -m charts.vwap AAPL` |
 
 ### `fundamentals/` — the longer-term picture
 
-| File | What it does |
-| --- | --- |
-| `marketcap.py` | Historical market-cap growth for selected tickers. |
-| `eps.py` | Quarterly EPS comparison across a group of tickers. |
-| `operatingdollars.py` | Operating margin trend over the last ~12 quarters. |
-| `quarteroverquarter_revenue.py` | Quarter-over-quarter revenue change (sample data). |
-| `yearoveryear_revenue.py` | Year-over-year revenue growth with a forward estimate (sample data). |
+| File | What it does | Run it |
+| --- | --- | --- |
+| `marketcap.py` | Historical market-cap growth for selected tickers. | `python -m fundamentals.marketcap` |
+| `eps.py` | Quarterly EPS comparison across a group of tickers. | `python -m fundamentals.eps` |
+| `operatingdollars.py` | Operating margin trend over the last ~12 quarters. | `python -m fundamentals.operatingdollars` |
+| `quarteroverquarter_revenue.py` | Quarter-over-quarter revenue change (sample data). | `python -m fundamentals.quarteroverquarter_revenue` |
+| `yearoveryear_revenue.py` | Year-over-year revenue growth with a forward estimate (sample data). | `python -m fundamentals.yearoveryear_revenue` |
 
 ### `launchers/` — open several at once
 
-| File | What it does |
-| --- | --- |
-| `openAllTickerApps.py` | Spawns the earnings tracker, daily movers, heat map, sector analysis, and technical indicators in parallel. |
-| `openSingleTickerApp.py` | Opens VWAP, RSI, and candlestick views for one or more tickers at once. |
+| File | What it does | Run it |
+| --- | --- | --- |
+| `openAllTickerApps.py` | Spawns the earnings tracker, daily movers, heat map, sector analysis, and technical indicators in parallel. | `python -m launchers.openAllTickerApps` |
+| `openSingleTickerApp.py` | Opens VWAP, RSI, and candlestick views for one or more tickers at once. | `python -m launchers.openSingleTickerApp AAPL 6` |
 
 ---
 

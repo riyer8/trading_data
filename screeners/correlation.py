@@ -8,6 +8,7 @@ from tkinter import ttk
 import yfinance as yf
 from portfolio.portfolioInfo import MY_TICKERS
 from scipy.stats import pearsonr
+from ui.theme import Colors, style_table, apply_row_stripes
 
 CORRELATION_WEIGHTS = {
     'beta': 0,
@@ -225,13 +226,15 @@ def sort_tickers(treeview, column, reverse):
         treeview.heading(col, text=col)
     arrow = "↓" if reverse else "↑"
     treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_tickers(treeview, column, not reverse))
+    apply_row_stripes(treeview)
 
 def display_tickers(symbol, min_corr_factor):
     root = tk.Tk()
     root.title(f"Tickers Correlated with {symbol}")
+    style_table(root)
 
-    frame = tk.Frame(root)
-    frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+    frame = tk.Frame(root, bg=Colors.BACKGROUND)
+    frame.pack(padx=12, pady=12, fill=tk.BOTH, expand=True)
 
     correlated_tickers = filter_tickers(symbol, min_corr_factor)
     columns = ("Ticker", "Company Name", "Correlation", "Current Price")
@@ -251,6 +254,7 @@ def display_tickers(symbol, min_corr_factor):
     for ticker, company_name, corr_factor, current_price in correlated_tickers:
         tree.insert("", tk.END, values=(ticker, company_name, f"{corr_factor:.2f}", f"{current_price:.2f}"))
 
+    apply_row_stripes(tree)
     tree.pack(expand=True, fill=tk.BOTH)
     root.mainloop()
 

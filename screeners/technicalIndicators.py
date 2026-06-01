@@ -8,6 +8,7 @@ from tkinter import ttk
 import yfinance as yf
 import time
 from portfolio.portfolioInfo import MY_TICKERS
+from ui.theme import Colors, style_table, apply_row_stripes
 
 def fetch_all_tickers():
     return sorted(set(MY_TICKERS))
@@ -112,12 +113,14 @@ def sort_treeview_column(treeview, column, reverse):
             treeview.heading(col, text=f"{col} {arrow}", command=lambda c=col: sort_treeview_column(treeview, c, not reverse))
         else:
             treeview.heading(col, text=col, command=lambda c=col: sort_treeview_column(treeview, c, False))
+    apply_row_stripes(treeview)
 
 def create_technical_indicators_screen():
     root = tk.Tk()
     root.title("Technical Indicators")
-    frame = tk.Frame(root)
-    frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+    style_table(root)
+    frame = tk.Frame(root, bg=Colors.BACKGROUND)
+    frame.pack(padx=12, pady=12, fill=tk.BOTH, expand=True)
 
     tickers = fetch_all_tickers()
     columns = ("Ticker", "Company Name", "Sector", "Last Price", "RSI", "P/E Ratio", "50-Day MA", "Short % Float", "SPX Beta")
@@ -154,6 +157,7 @@ def create_technical_indicators_screen():
 
         tree.insert("", tk.END, values=(ticker, company_name, sector, last_price_display, rsi_display, pe_ratio_display, ma_50_display, short_percent_float_display, spx_beta_display))
 
+    apply_row_stripes(tree)
     tree.pack(expand=True, fill=tk.BOTH)
     root.mainloop()
 

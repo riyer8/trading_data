@@ -8,6 +8,7 @@ import yfinance as yf
 import time
 from portfolio.portfolioInfo import MY_TICKERS, ALL_TICKERS
 from charts.stockChart import main as plot_stock_chart
+from ui.theme import Colors, style_table, apply_row_stripes
 import matplotlib.pyplot as plt
 import numpy as np
 import requests
@@ -118,6 +119,7 @@ def sort_tickers(treeview, column, reverse):
 
     arrow = "↓" if reverse else "↑"
     treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_tickers(treeview, column, not reverse))
+    apply_row_stripes(treeview)
 
 def on_ticker_double_click(event, tree):
     item = tree.selection()[0]
@@ -127,9 +129,10 @@ def on_ticker_double_click(event, tree):
 def display_tickers():
     root = tk.Tk()
     root.title("Top Moving Tickers")
+    style_table(root)
 
-    frame = tk.Frame(root)
-    frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+    frame = tk.Frame(root, bg=Colors.BACKGROUND)
+    frame.pack(padx=12, pady=12, fill=tk.BOTH, expand=True)
 
     top_moving_tickers = filter_tickers()
     columns = ("Ticker", "Company Name", "Sector", "Last Price", "Percentage Change", "Standard Deviation", "Volume", "Volume Change")
@@ -144,15 +147,13 @@ def display_tickers():
         tree.heading(col, text=col, command=lambda col=col: sort_tickers(tree, col, False))
         tree.column(col, width=column_widths[col])
 
-    tree.tag_configure("positive", foreground="green")
-    tree.tag_configure("negative", foreground="red")
-
     tree.bind("<Double-1>", lambda event: on_ticker_double_click(event, tree))
 
     for ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change, _ in top_moving_tickers:
         tag = "positive" if percentage_change > 0 else "negative"
         tree.insert("", tk.END, values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", volume_to_string(volume), f"{volume_change:.2f}"), tags=(tag,))
 
+    apply_row_stripes(tree)
     tree.pack(expand=True, fill=tk.BOTH)
 
     root.mainloop()

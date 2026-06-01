@@ -1,10 +1,15 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import yfinance as yf
 import mplfinance as mpf
 import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.widgets import RectangleSelector
-import sys
+
+from ui.theme import Colors, candlestick_style, moving_average_colors, style_legend, set_window_title
 
 def fetch_stock_history(ticker):
     stock = yf.Ticker(ticker)
@@ -20,9 +25,13 @@ def filter_data_by_lookback(stock_history, lookback_months):
     return stock_history[start_date:end_date]
 
 def calculate_moving_averages(data, windows):
+    colors = moving_average_colors(len(windows))
     return [
-        mpf.make_addplot(data['Close'].rolling(window=ma, min_periods=1).mean(), panel=0, color='grey')
-        for ma in windows
+        mpf.make_addplot(
+            data['Close'].rolling(window=ma, min_periods=1).mean(),
+            panel=0, color=color, width=1.2,
+        )
+        for ma, color in zip(windows, colors)
     ]
 
 def calculate_bollinger_bands(data, window=20, std_dev=2):
@@ -38,8 +47,8 @@ def plot_candlestick_chart(ticker, data, lookback_months, moving_averages, bolli
     fig, ax = mpf.plot(
         data,
         type='candle',
-        style='charles',
-        title=f'{ticker.upper()} Candlestick Chart (Last {lookback_months} Months)',
+        style=candlestick_style(),
+        title=f'\n{ticker.upper()}  ·  Candlestick  ·  Last {lookback_months} Months',
         ylabel='Price (USD)',
         addplot=moving_averages,
         figratio=(12, 8),
@@ -49,8 +58,12 @@ def plot_candlestick_chart(ticker, data, lookback_months, moving_averages, bolli
         returnfig=True,
         warn_too_much_data=len(data) + 1000
     )
-    
-    ax[0].fill_between(data.index, bollinger_lower, bollinger_upper, color='grey', alpha=0.3)
+
+    set_window_title(fig, f"{ticker.upper()} · Candlestick")
+    ax[0].fill_between(data.index, bollinger_lower, bollinger_upper,
+                       color=Colors.ACCENT, alpha=0.12, label='Bollinger Bands (20, 2σ)')
+    ax[0].plot(data.index, bollinger_upper, color=Colors.ACCENT, alpha=0.4, linewidth=0.8)
+    ax[0].plot(data.index, bollinger_lower, color=Colors.ACCENT, alpha=0.4, linewidth=0.8)
     return fig, ax
 
 def setup_zooming(ax, fig):
@@ -87,8 +100,8 @@ def setup_zooming(ax, fig):
         minspanx=5, minspany=5,
         spancoords='pixels',
         interactive=False,
-        props=dict(edgecolor='green', linestyle='-', linewidth=2,
-                   facecolor='lightgreen', alpha=0.3, fill=True),
+        props=dict(edgecolor=Colors.SELECTION, linestyle='-', linewidth=1.5,
+                   facecolor=Colors.SELECTION, alpha=0.2, fill=True),
     )
 
     fig.canvas.mpl_connect('button_press_event', on_double_click)

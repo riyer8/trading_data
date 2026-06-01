@@ -1,52 +1,64 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from ui.theme import Colors, apply_chart_theme, moving_average_colors, style_legend, value_tag, set_window_title
+
 START_DATE = "2024-01-01"
 END_DATE = "2024-12-31"
+
 
 def calculate_ema(data, period):
     return data['Close'].ewm(span=period, adjust=False).mean()
 
-def annotate_last_value(ax, data, label, color):
-    last_date = data.index[-1]
-    last_value = data[-1]
-    ax.text(last_date, last_value, f'{last_value:.2f}', color=color, 
-            fontsize=10, fontweight='bold', verticalalignment='bottom')
 
 def plot_ema(ticker):
     data = yf.download(ticker, start=START_DATE, end=END_DATE)
+
+    # Recent yfinance returns MultiIndex columns (field, ticker); flatten to a single level.
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
 
     if data.empty:
         print(f"No data found for ticker symbol: {ticker}")
         return
 
-    data['20-day EMA'] = calculate_ema(data, 20)
-    data['50-day EMA'] = calculate_ema(data, 50)
-    data['200-day EMA'] = calculate_ema(data, 200)
+    periods = [20, 50, 200]
+    for period in periods:
+        data[f'{period}-day EMA'] = calculate_ema(data, period)
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    
-    ax.plot(data['Close'], label='Closing Price', color='black', linewidth=1.5)
-    ax.plot(data['20-day EMA'], label='20-day EMA', color='blue', linestyle='--', linewidth=1.2)
-    ax.plot(data['50-day EMA'], label='50-day EMA', color='orange', linestyle='--', linewidth=1.2)
-    ax.plot(data['200-day EMA'], label='200-day EMA', color='red', linestyle='--', linewidth=1.2)
+    apply_chart_theme()
+    fig, ax = plt.subplots(figsize=(11, 6))
+    set_window_title(fig, f"{ticker.upper()} · EMAs")
 
-    annotate_last_value(ax, data['Close'], 'Closing Price', 'black')
-    annotate_last_value(ax, data['20-day EMA'], '20-day EMA', 'blue')
-    annotate_last_value(ax, data['50-day EMA'], '50-day EMA', 'orange')
-    annotate_last_value(ax, data['200-day EMA'], '200-day EMA', 'red')
+    ax.plot(data.index, data['Close'], label='Close', color=Colors.TEXT, linewidth=1.8)
+    value_tag(ax, data.index[-1], data['Close'].iloc[-1], f"{data['Close'].iloc[-1]:,.2f}", Colors.TEXT)
 
-    ax.set_title(f"{ticker} EMAs", fontsize=16)
-    plt.xticks(rotation=30)
-    ax.set_xlabel("Date", fontsize=12)
-    ax.set_ylabel("Closing Price", fontsize=12)
-    ax.legend(loc='upper left')
-    ax.grid(True)
-    plt.tight_layout()
+    ema_colors = moving_average_colors(len(periods))
+    for period, color in zip(periods, ema_colors):
+        column = f'{period}-day EMA'
+        ax.plot(data.index, data[column], label=column, color=color, linestyle='--', linewidth=1.3)
+        value_tag(ax, data.index[-1], data[column].iloc[-1], f"{data[column].iloc[-1]:,.2f}", color)
 
+    ax.set_title(f"{ticker.upper()}  Exponential Moving Averages")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Price (USD)")
+    ax.margins(x=0.01)
+    style_legend(ax, loc='upper left')
+
+    fig.autofmt_xdate(rotation=30)
+    fig.tight_layout()
     plt.show()
 
+
 if __name__ == "__main__":
-    ticker_input = input("Enter a valid stock ticker symbol: ")
+    if len(sys.argv) < 2:
+        ticker_input = input("Enter a valid stock ticker symbol: ")
+    else:
+        ticker_input = sys.argv[1]
+
     plot_ema(ticker_input)

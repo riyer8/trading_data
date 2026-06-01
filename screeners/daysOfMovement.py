@@ -8,6 +8,7 @@ import yfinance as yf
 import time
 import numpy as np
 from screeners.correlation import filter_tickers
+from ui.theme import Colors, style_sheet
 
 def fetch_ticker_data_with_retry(ticker, retries=5, delay=2):
     for attempt in range(retries):
@@ -69,6 +70,7 @@ def get_clicked_column_index(event, sheet):
 def display_percentage_changes(ticker):
     root = tk.Tk()
     root.title(f"Percentage Changes for {ticker} and Correlated Tickers")
+    root.configure(bg=Colors.BACKGROUND)
 
     correlated_tickers = []
     try:
@@ -91,6 +93,7 @@ def display_percentage_changes(ticker):
                   headers=headers,
                   width=1000,
                   height=175)
+    style_sheet(sheet)
 
     sheet.enable_bindings(("single_select", "column_select", "row_select",
                            "row_height_resize", "double_click_column_resize",
@@ -100,8 +103,9 @@ def display_percentage_changes(ticker):
         for j, cell in enumerate(row[1:], start=1):
             try:
                 cell_value = float(cell.strip('%'))
-                color = "#c8e6c9" if cell_value >= 0 else "#ffcdd2"
-                sheet.highlight_cells(row=i, column=j, bg=color, fg="black")
+                color = Colors.BULL_FILL if cell_value >= 0 else Colors.BEAR_FILL
+                fg = Colors.BULL if cell_value >= 0 else Colors.BEAR
+                sheet.highlight_cells(row=i, column=j, bg=color, fg=fg)
             except ValueError:
                 continue
 

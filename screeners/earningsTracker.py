@@ -7,6 +7,7 @@ from datetime import date
 import tkinter as tk
 from tkinter import ttk
 from portfolio.portfolioInfo import MY_TICKERS
+from ui.theme import Colors, style_table, apply_row_stripes
 
 def all_tickers():
     print(f"Total Number of Tickers: {len(MY_TICKERS)}")
@@ -76,13 +77,15 @@ def sort_tickers(treeview, column, reverse):
 
     arrow = "↓" if reverse else "↑"
     treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_tickers(treeview, column, not reverse))
+    apply_row_stripes(treeview)
 
 def display_tickers():
     root = tk.Tk()
     root.title("Upcoming Earnings Tickers")
+    style_table(root)
 
-    frame = tk.Frame(root)
-    frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+    frame = tk.Frame(root, bg=Colors.BACKGROUND)
+    frame.pack(padx=12, pady=12, fill=tk.BOTH, expand=True)
 
     ticker_data = filter_tickers()
     columns = ("Ticker", "Company Name", "Sector", "Upcoming Earnings")
@@ -99,6 +102,7 @@ def display_tickers():
     for item in ticker_data:
         tree.insert("", tk.END, values=item)
 
+    apply_row_stripes(tree)
     tree.pack(expand=True, fill=tk.BOTH)
     root.mainloop()
 
