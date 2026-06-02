@@ -13,3 +13,6 @@ tempCodeRunnerFile.py
 
 # Experimental / personal scratch scripts (kept locally, not versioned)
 experiments/pricedata.py
+
+# Local secrets
+chatbot/.env
