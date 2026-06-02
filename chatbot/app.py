@@ -15,10 +15,27 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from dotenv import load_dotenv
 
-from chatbot.launcher import format_command, launch_module
-from chatbot.llm import AssistantReply, LaunchAction, OpenRouterClient, fallback_reply
+from chatbot.launcher import (
+    close_all,
+    close_matching,
+    close_process,
+    format_command,
+    format_running_context,
+    launch_module,
+)
+from chatbot.llm import AssistantReply, OpenRouterClient, ToolAction, fallback_reply
+from chatbot.entities import (
+    gather_conversation_context,
+    gather_user_messages,
+    normalize_action_args,
+    resolve_entities,
+    build_launch_args,
+    missing_requirement,
+)
+from chatbot.tool_specs import module_requires_args
+from chatbot.intent import enhance_reply, finalize_launch_actions
 from chatbot.rag import ReadmeIndex
-from chatbot.widgets import CircleButton, PillButton, PlaceholderInput, PromptRow, StatusDot
+from chatbot.widgets import CircleButton, HorizontalScrollRow, PillButton, PlaceholderInput, PromptRow, StatusDot
 from ui.theme import Colors, Fonts
 
 CHATBOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -58,6 +75,7 @@ class ChatbotApp:
         self._typing_frame = 0
         self._typing_job: str | None = None
         self._starters_visible = True
+        self._session_entities = None
 
         self._configure_fonts()
         self._build_layout()
@@ -224,8 +242,10 @@ class ChatbotApp:
             "role_system",
             foreground=Colors.ACCENT_5,
             font=self.font_role,
-            justify=tk.CENTER,
-            spacing1=4,
+            lmargin1=12,
+            rmargin=60,
+            justify=tk.LEFT,
+            spacing1=2,
         )
 
         # Message bubbles
@@ -253,11 +273,11 @@ class ChatbotApp:
             "system_bubble",
             background=SYSTEM_BUBBLE,
             foreground=Colors.TEXT,
-            lmargin1=24,
-            lmargin2=24,
-            rmargin=24,
-            spacing1=6,
-            spacing3=6,
+            lmargin1=12,
+            lmargin2=12,
+            rmargin=56,
+            spacing1=8,
+            spacing3=8,
         )
         self.chat.tag_configure(
             "typing_body",
@@ -310,47 +330,133 @@ class ChatbotApp:
         for child in self.actions_frame.winfo_children():
             child.destroy()
 
-    def _render_actions(self, actions: list[LaunchAction]) -> None:
+    def _render_actions(self, actions: list[ToolAction]) -> None:
         self._clear_actions()
         if not actions:
             return
 
-        tk.Label(
-            self.actions_frame,
-            text="Suggested tools",
-            bg=Colors.BACKGROUND,
-            fg=Colors.MUTED,
-            font=self.font_small,
-        ).pack(anchor=tk.W, pady=(0, 6))
+        launches = [action for action in actions if action.kind == "launch"]
+        closes = [action for action in actions if action.kind == "close"]
 
-        row = tk.Frame(self.actions_frame, bg=Colors.BACKGROUND)
-        row.pack(fill=tk.X)
-
-        for action in actions:
-            PillButton(
-                row,
-                text=action.label,
-                command=lambda a=action: self._launch_action(a),
-                accent=True,
-                padx=14,
-                pady=7,
+        if launches:
+            header = tk.Frame(self.actions_frame, bg=Colors.BACKGROUND)
+            header.pack(fill=tk.X, pady=(0, 6))
+            tk.Label(
+                header,
+                text="Suggested tools",
                 bg=Colors.BACKGROUND,
-            ).pack(side=tk.LEFT, padx=(0, 8), pady=2)
+                fg=Colors.MUTED,
+                font=self.font_small,
+            ).pack(side=tk.LEFT)
 
-    def _launch_action(self, action: LaunchAction) -> None:
-        threading.Thread(
-            target=self._launch_worker,
-            args=(action,),
-            daemon=True,
-        ).start()
+            if len(launches) > 1:
+                PillButton(
+                    header,
+                    text="Launch all",
+                    command=lambda items=launches: self._launch_all(items),
+                    accent=True,
+                    padx=12,
+                    pady=6,
+                    bg=Colors.BACKGROUND,
+                ).pack(side=tk.RIGHT)
 
-    def _launch_worker(self, action: LaunchAction) -> None:
+            row = HorizontalScrollRow(self.actions_frame, bg=Colors.BACKGROUND)
+            row.pack(fill=tk.X, pady=(0, 6 if closes else 0))
+
+            for action in launches:
+                PillButton(
+                    row.inner,
+                    text=action.label,
+                    command=lambda a=action: self._run_action(a),
+                    accent=True,
+                    padx=14,
+                    pady=7,
+                    bg=Colors.BACKGROUND,
+                ).pack(side=tk.LEFT, padx=(0, 8), pady=2)
+
+        if closes:
+            tk.Label(
+                self.actions_frame,
+                text="Close applications",
+                bg=Colors.BACKGROUND,
+                fg=Colors.MUTED,
+                font=self.font_small,
+            ).pack(anchor=tk.W, pady=(0, 6))
+
+            row = HorizontalScrollRow(self.actions_frame, bg=Colors.BACKGROUND)
+            row.pack(fill=tk.X)
+
+            for action in closes:
+                PillButton(
+                    row.inner,
+                    text=action.label,
+                    command=lambda a=action: self._run_action(a),
+                    danger=True,
+                    padx=14,
+                    pady=7,
+                    bg=Colors.BACKGROUND,
+                ).pack(side=tk.LEFT, padx=(0, 8), pady=2)
+
+    def _launch_all(self, actions: list[ToolAction]) -> None:
+        for action in actions:
+            self._run_action(action)
+
+    def _run_action(self, action: ToolAction) -> None:
+        if action.kind == "close":
+            threading.Thread(target=self._close_worker, args=(action,), daemon=True).start()
+        else:
+            threading.Thread(target=self._launch_worker, args=(action,), daemon=True).start()
+
+    def _launch_worker(self, action: ToolAction) -> None:
         try:
-            launch_module(action.module, action.args)
-            cmd = format_command(action.module, action.args)
-            self.root.after(0, lambda: self._append_message("system", f"Launched {cmd}"))
+            args = normalize_action_args(action.module, list(action.args))
+
+            if module_requires_args(action.module) and not args:
+                context = gather_conversation_context(self.history, "")
+                user_only = gather_user_messages(self.history, "")
+                entities = resolve_entities(context, self._session_entities, user_text=user_only)
+                args = build_launch_args(action.module, entities)
+                if not args:
+                    prompt = missing_requirement(action.module, entities)
+                    message = prompt or f"Missing information to launch {action.label}."
+                    self.root.after(0, lambda m=message: self._append_message("assistant", m))
+                    return
+
+            result = launch_module(action.module, args)
+            cmd = format_command(action.module, args)
+            self.root.after(
+                0,
+                lambda c=cmd, pid=result.pid: self._append_message(
+                    "system", f"Launched {c} (pid {pid})"
+                ),
+            )
         except Exception as exc:
-            self.root.after(0, lambda: messagebox.showerror("Launch failed", str(exc)))
+            self.root.after(0, lambda e=exc: messagebox.showerror("Launch failed", str(e)))
+
+    def _close_worker(self, action: ToolAction) -> None:
+        try:
+            if action.target == "all":
+                closed = close_all()
+                if closed:
+                    msg = f"Closed {len(closed)} running tool(s)."
+                else:
+                    msg = "No running tools to close."
+            elif action.pid is not None:
+                if close_process(action.pid):
+                    msg = f"Closed pid {action.pid}."
+                else:
+                    msg = f"Could not close pid {action.pid} — it may have already exited."
+            elif action.module:
+                closed = close_matching(action.module, action.args)
+                if closed:
+                    msg = f"Closed {len(closed)} matching tool(s)."
+                else:
+                    msg = f"No running tools matched {action.module}."
+            else:
+                msg = "Nothing to close — specify a running app or use close all."
+            self.root.after(0, lambda: self._append_message("system", msg))
+        except Exception as exc:
+            self.root.after(0, lambda: messagebox.showerror("Close failed", str(exc)))
 
     def _show_typing(self) -> None:
         self.chat.configure(state=tk.NORMAL)
@@ -414,8 +520,20 @@ class ChatbotApp:
         try:
             retrieved = self.index.search(user_message, top_k=5)
             context = self.index.format_context(retrieved)
+            running_context = format_running_context()
             if self.llm.available:
-                reply = self.llm.chat(user_message, context, self.history)
+                reply = self.llm.chat(
+                    user_message,
+                    context,
+                    self.history,
+                    running_context=running_context,
+                )
+                user_context = gather_conversation_context(self.history, user_message)
+                user_only = gather_user_messages(self.history, user_message)
+                rag_modules = [item.chunk.module for item in retrieved if item.chunk.module]
+                reply = enhance_reply(reply, user_message, user_context, user_only, rag_modules)
+                reply = finalize_launch_actions(reply, user_context, user_only, rag_modules)
+                self._session_entities = reply.entities
                 self.history.append({"role": "user", "content": user_message})
                 self.history.append({"role": "assistant", "content": reply.message})
             else:
@@ -457,7 +575,7 @@ def _detach_from_terminal() -> bool:
         stderr=subprocess.DEVNULL,
         close_fds=True,
     )
-    print("Trading Data Assistant opened — this terminal is free to use.")
+    print("Trading Data Assistant opened.")
     return True
 
 

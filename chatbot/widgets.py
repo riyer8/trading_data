@@ -32,6 +32,7 @@ class PillButton(tk.Canvas):
         fg: str = Colors.TEXT,
         accent: bool = False,
         soft: bool = False,
+        danger: bool = False,
         font: tkfont.Font | None = None,
         padx: int = 16,
         pady: int = 8,
@@ -39,7 +40,11 @@ class PillButton(tk.Canvas):
     ):
         self._command = command
         self._text = text
-        if accent:
+        if danger:
+            self._fill = Colors.BEAR_FILL
+            self._hover = _lighten(Colors.BEAR_FILL, 0.18)
+            self._fg = Colors.BEAR
+        elif accent:
             self._fill = Colors.ACCENT
             self._hover = _lighten(Colors.ACCENT, 0.12)
             self._fg = "#ffffff"
@@ -161,6 +166,49 @@ class CircleButton(tk.Canvas):
         self._draw(self._fill if enabled else Colors.GRID)
 
 
+class HorizontalScrollRow(tk.Frame):
+    """Horizontally scrollable row for pill buttons that overflow the window."""
+
+    def __init__(self, parent: tk.Misc, *, bg: str = Colors.BACKGROUND, height: int = 44):
+        super().__init__(parent, bg=bg)
+        self._bg = bg
+
+        self.canvas = tk.Canvas(
+            self,
+            height=height,
+            bg=bg,
+            highlightthickness=0,
+            borderwidth=0,
+        )
+        scrollbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        self.inner = tk.Frame(self.canvas, bg=bg)
+
+        self.inner.bind("<Configure>", self._on_inner_configure)
+        self._window_id = self.canvas.create_window((0, 0), window=self.inner, anchor=tk.NW)
+        self.canvas.configure(xscrollcommand=scrollbar.set)
+
+        self.canvas.pack(fill=tk.X, expand=True)
+        scrollbar.pack(fill=tk.X)
+
+        self.canvas.bind("<Enter>", self._bind_mousewheel)
+        self.canvas.bind("<Leave>", self._unbind_mousewheel)
+
+    def _on_inner_configure(self, _event) -> None:
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _bind_mousewheel(self, _event) -> None:
+        self.canvas.bind("<Shift-MouseWheel>", self._scroll_x)
+
+    def _unbind_mousewheel(self, _event) -> None:
+        self.canvas.unbind("<Shift-MouseWheel>")
+
+    def _scroll_x(self, event) -> None:
+        delta = getattr(event, "delta", 0)
+        if delta == 0:
+            return
+        self.canvas.xview_scroll(int(-delta / 120), "units")
+
+
 class PromptRow(tk.Frame):
     """Example prompt chips."""
 
@@ -199,25 +247,47 @@ class PlaceholderInput(tk.Text):
         self._showing_placeholder = False
         self.bind("<FocusIn>", self._on_focus_in)
         self.bind("<FocusOut>", self._on_focus_out)
+        self.bind("<KeyPress>", self._on_key_press)
+        self.bind("<Button-1>", self._on_click, add="+")
         self.show_placeholder()
+
+    def _has_focus(self) -> bool:
+        return self.focus_get() is self
+
+    def _clear_placeholder(self) -> None:
+        if not self._showing_placeholder:
+            return
+        self.delete("1.0", tk.END)
+        self.configure(fg=self.normal_color)
+        self._showing_placeholder = False
 
     def show_placeholder(self) -> None:
         if self.get("1.0", tk.END).strip():
             return
+        if self._has_focus():
+            # Keep the box empty while focused so the next keystroke is not appended
+            # to placeholder text (FocusIn does not re-fire if focus never left).
+            self._clear_placeholder()
+            return
         self._showing_placeholder = True
         self.configure(fg=self.placeholder_color)
+        self.delete("1.0", tk.END)
         self.insert("1.0", self.placeholder)
         self.mark_set(tk.INSERT, "1.0")
 
     def _on_focus_in(self, _event) -> None:
-        if self._showing_placeholder:
-            self.delete("1.0", tk.END)
-            self.configure(fg=self.normal_color)
-            self._showing_placeholder = False
+        self._clear_placeholder()
 
     def _on_focus_out(self, _event) -> None:
         if not self.get("1.0", tk.END).strip():
             self.show_placeholder()
+
+    def _on_key_press(self, _event) -> None:
+        if self._showing_placeholder:
+            self._clear_placeholder()
+
+    def _on_click(self, _event) -> None:
+        self.after_idle(self._clear_placeholder)
 
     def get_text(self) -> str:
         if self._showing_placeholder:
@@ -227,13 +297,16 @@ class PlaceholderInput(tk.Text):
     def clear(self) -> None:
         self.configure(state=tk.NORMAL)
         self.delete("1.0", tk.END)
-        self.show_placeholder()
+        self._showing_placeholder = False
+        self.configure(fg=self.normal_color)
+        if not self._has_focus():
+            self.show_placeholder()
 
     def set_writable(self, writable: bool) -> None:
         """Toggle editability without leaving the widget in a broken state."""
         if writable:
             self.configure(state=tk.NORMAL)
-            if not self.get("1.0", tk.END).strip() and not self._showing_placeholder:
+            if not self.get("1.0", tk.END).strip() and not self._has_focus():
                 self.show_placeholder()
         else:
             self.configure(state=tk.DISABLED)
