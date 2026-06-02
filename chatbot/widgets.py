@@ -324,4 +324,8 @@ class StatusDot(tk.Canvas):
             borderwidth=0,
             bg=Colors.BACKGROUND,
         )
-        self.create_oval(1, 1, size - 1, size - 1, fill=color, outline=color)
+        self._size = size
+        self._dot = self.create_oval(1, 1, size - 1, size - 1, fill=color, outline=color)
+
+    def set_color(self, color: str) -> None:
+        self.itemconfigure(self._dot, fill=color, outline=color)

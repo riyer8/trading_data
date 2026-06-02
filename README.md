@@ -18,7 +18,7 @@ on-disk data cache** (`datacache/`) so repeated lookups across apps don't re-hit
 ```sh
 # 1. (optional) create and activate a virtual environment
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\\Scripts\\activate
 
 # 2. install dependencies
 pip install -r requirements.txt
@@ -28,6 +28,10 @@ python -m screeners.dailyMovers
 python -m charts.vwap AAPL
 python -m launchers.openAllTickerApps
 python -m launchers.openSingleTickerApp AAPL 6
+
+# 4. run the chatbot assistant (optional)
+pip install -r chatbot/requirements.txt
+python -m chatbot
 ```
 
 > **Run from the repo root.** Tools are organized into packages (`screeners`, `charts`, …),
@@ -45,7 +49,7 @@ trading_data/
 │   └── portfolioInfo.py
 ├── datacache/          # shared 30-min on-disk cache for yfinance lookups
 │   └── __init__.py
-├── ui/                   # shared dark “trading desk” styling for charts & tables
+├── ui/                 # shared dark “trading desk” styling for charts & tables
 │   └── theme.py
 ├── screeners/          # scan the whole watchlist → interactive tables / charts
 │   ├── dailyMovers.py
@@ -67,6 +71,18 @@ trading_data/
 ├── launchers/          # convenience scripts that open several tools at once
 │   ├── openAllTickerApps.py
 │   └── openSingleTickerApp.py
+├── chatbot/            # interactive assistant UI and local tool launcher
+│   ├── __main__.py
+│   ├── app.py
+│   ├── entities.py
+│   ├── intent.py
+│   ├── launcher.py
+│   ├── llm.py
+│   ├── offline.py
+│   ├── rag.py
+│   ├── requirements.txt
+│   ├── tool_specs.py
+│   └── widgets.py
 ├── experiments/        # scratch / non-trading prototypes (local only)
 │   └── pricedata.py
 ├── .datacache/         # auto-generated market-data cache (git-ignored)
@@ -115,7 +131,7 @@ screeners, charts, and fundamentals all import from it. Data fetching goes throu
 | File | What it does | Run it |
 | --- | --- | --- |
 | `marketcap.py` | Historical market-cap growth for every ticker in `MY_TICKERS`, with a scrollable color-coded key beside the chart. | `python -m fundamentals.marketcap` |
-| `eps.py` | Quarterly EPS comparison; defaults to big-tech tickers (Magnificent Seven). | `python -m fundamentals.eps` or `python -m fundamentals.eps AAPL,MSFT` |
+| `eps.py` | Quarterly EPS comparison; defaults to big-tech tickers. | `python -m fundamentals.eps` or `python -m fundamentals.eps AAPL,MSFT` |
 | `operatingdollars.py` | Operating margin trend over the last 12 quarters for a single ticker. | `python -m fundamentals.operatingdollars AAPL` |
 
 ### `launchers/` — open several at once
@@ -124,6 +140,12 @@ screeners, charts, and fundamentals all import from it. Data fetching goes throu
 | --- | --- | --- |
 | `openAllTickerApps.py` | Spawns the earnings tracker, daily movers, heat map, sector analysis, and technical indicators in parallel. | `python -m launchers.openAllTickerApps` |
 | `openSingleTickerApp.py` | Opens VWAP, RSI, and candlestick views for one or more tickers in parallel (all windows at once). | `python -m launchers.openSingleTickerApp AAPL 6` |
+
+### `chatbot/` — interactive assistant
+
+| File | What it does | Run it |
+| --- | --- | --- |
+| `__main__.py` | Launches a Tkinter chatbot UI that can query the trading tools and local README knowledge. | `python -m chatbot` |
 
 ---
 
@@ -173,10 +195,26 @@ Central palette, fonts, and helpers used by every chart and table:
 
 ---
 
+## Dependencies
+
+Install the core trading tools with:
+
+```sh
+pip install -r requirements.txt
+```
+
+If you want the chatbot UI, also install:
+
+```sh
+pip install -r chatbot/requirements.txt
+```
+
+---
+
 ## Notes
 
 - Data comes from Yahoo Finance via `yfinance`, which is rate-limited and occasionally returns
-  gaps. Several scripts retry with backoff; the shared cache reduces duplicate requests.
+gaps. Several scripts retry with backoff; the shared cache reduces duplicate requests.
 - The interactive tables and charts require a desktop environment (Tkinter + a matplotlib GUI
   backend); they won't render on a headless server.
 - `fundamentals/marketcap.py` embeds matplotlib in a Tk window (for the scrollable legend).

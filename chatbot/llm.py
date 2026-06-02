@@ -276,16 +276,3 @@ def _parse_reply_json(content: str) -> AssistantReply:
     return AssistantReply(message=message, actions=actions, entities=entities, used_llm=True)
 
 
-def fallback_reply(user_message: str, readme_context: str, retrieved_labels: list[str]) -> AssistantReply:
-    """RAG-only response when no API key is configured."""
-    lines = [
-        "The assistant is running in offline mode without an API key.",
-        "Add OPENROUTER_API_KEY to chatbot/.env for full responses.",
-        "",
-    ]
-    if retrieved_labels:
-        lines.append("Based on the README, these tools may be relevant:")
-        lines.extend(f"· {label}" for label in retrieved_labels[:4])
-    else:
-        lines.append("Try asking about a specific chart, screener, or ticker symbol.")
-    return AssistantReply(message="\n".join(lines), actions=[], used_llm=False)

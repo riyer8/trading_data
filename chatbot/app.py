@@ -23,7 +23,8 @@ from chatbot.launcher import (
     format_running_context,
     launch_module,
 )
-from chatbot.llm import AssistantReply, OpenRouterClient, ToolAction, fallback_reply
+from chatbot.llm import AssistantReply, OpenRouterClient, ToolAction
+from chatbot.offline import ENV_HINT, OfflineContext, classify_api_error, offline_reply, system_notice
 from chatbot.entities import (
     gather_conversation_context,
     gather_user_messages,
@@ -76,6 +77,7 @@ class ChatbotApp:
         self._typing_job: str | None = None
         self._starters_visible = True
         self._session_entities = None
+        self._api_degraded = False
 
         self._configure_fonts()
         self._build_layout()
@@ -140,8 +142,11 @@ class ChatbotApp:
         row = tk.Frame(header, bg=Colors.BACKGROUND)
         row.pack(fill=tk.X)
 
-        dot_color = Colors.BULL if self.llm.available else Colors.ACCENT_2
-        StatusDot(row, color=dot_color).pack(side=tk.LEFT, padx=(0, 8))
+        self.status_dot = StatusDot(
+            row,
+            color=Colors.BULL if self.llm.available else Colors.ACCENT_2,
+        )
+        self.status_dot.pack(side=tk.LEFT, padx=(0, 8))
 
         tk.Label(
             row,
@@ -166,15 +171,15 @@ class ChatbotApp:
             swatch.create_oval(1, 1, 7, 7, fill=color, outline=color)
             tk.Label(item, text=label, bg=Colors.BACKGROUND, fg=Colors.MUTED, font=self.font_small).pack(side=tk.LEFT)
 
-        status = "Ready" if self.llm.available else "Offline"
-        tk.Label(
+        self.status_label = tk.Label(
             header,
-            text=status,
+            text="Ready" if self.llm.available else "Offline · local tools only",
             bg=Colors.BACKGROUND,
-            fg=Colors.MUTED,
+            fg=Colors.MUTED if self.llm.available else Colors.ACCENT_5,
             font=self.font_subtitle,
             anchor=tk.W,
-        ).pack(fill=tk.X, pady=(2, 0), padx=(18, 0))
+        )
+        self.status_label.pack(fill=tk.X, pady=(2, 0), padx=(18, 0))
 
     def _build_compose(self, parent: tk.Frame) -> None:
         compose = tk.Frame(parent, bg=Colors.BACKGROUND)
@@ -303,11 +308,27 @@ class ChatbotApp:
         self.chat.configure(state=tk.DISABLED)
         self._scroll_chat_to_end()
 
+    def _set_connection_status(self, mode: str) -> None:
+        labels = {
+            "ready": ("Ready", Colors.MUTED, Colors.BULL),
+            "offline": ("Offline · local tools only", Colors.ACCENT_5, Colors.ACCENT_2),
+            "degraded": ("Limited · local fallback", Colors.ACCENT_5, Colors.ACCENT_2),
+        }
+        text, fg, dot = labels.get(mode, labels["ready"])
+        self.status_label.configure(text=text, fg=fg)
+        self.status_dot.set_color(dot)
+
     def _show_welcome(self) -> None:
         self._append_message(
             "assistant",
             "Ask about tools, charts, or screeners — or tap an example below.",
         )
+        if not self.llm.available:
+            self._append_message(
+                "system",
+                "Offline mode — I can still match README tools and launch them locally. "
+                f"{ENV_HINT}",
+            )
 
     def _hide_starters(self) -> None:
         if not self._starters_visible:
@@ -517,39 +538,65 @@ class ChatbotApp:
         threading.Thread(target=self._handle_query, args=(text,), daemon=True).start()
 
     def _handle_query(self, user_message: str) -> None:
+        api_fallback: OfflineContext | None = None
         try:
             retrieved = self.index.search(user_message, top_k=5)
-            context = self.index.format_context(retrieved)
             running_context = format_running_context()
+            user_context = gather_conversation_context(self.history, user_message)
+            user_only = gather_user_messages(self.history, user_message)
+            rag_modules = [item.chunk.module for item in retrieved if item.chunk.module]
+
             if self.llm.available:
-                reply = self.llm.chat(
-                    user_message,
-                    context,
-                    self.history,
-                    running_context=running_context,
-                )
-                user_context = gather_conversation_context(self.history, user_message)
-                user_only = gather_user_messages(self.history, user_message)
-                rag_modules = [item.chunk.module for item in retrieved if item.chunk.module]
-                reply = enhance_reply(reply, user_message, user_context, user_only, rag_modules)
-                reply = finalize_launch_actions(reply, user_context, user_only, rag_modules)
-                self._session_entities = reply.entities
-                self.history.append({"role": "user", "content": user_message})
-                self.history.append({"role": "assistant", "content": reply.message})
+                try:
+                    reply = self.llm.chat(
+                        user_message,
+                        self.index.format_context(retrieved),
+                        self.history,
+                        running_context=running_context,
+                    )
+                    reply = enhance_reply(reply, user_message, user_context, user_only, rag_modules)
+                    reply = finalize_launch_actions(reply, user_context, user_only, rag_modules)
+                    self._session_entities = reply.entities
+                except Exception as exc:
+                    api_fallback = classify_api_error(exc)
+                    reply = offline_reply(
+                        user_message,
+                        self.history,
+                        retrieved,
+                        reason=api_fallback.reason,
+                        detail=api_fallback.detail,
+                    )
+                    self._session_entities = reply.entities
             else:
-                labels = [item.chunk.title for item in retrieved]
-                reply = fallback_reply(user_message, context, labels)
+                reply = offline_reply(user_message, self.history, retrieved, reason="missing_key")
+                self._session_entities = reply.entities
+
+            self.history.append({"role": "user", "content": user_message})
+            self.history.append({"role": "assistant", "content": reply.message})
         except Exception as exc:
             reply = AssistantReply(
-                message=f"An error occurred while processing your request:\n{exc}",
+                message=(
+                    "Something went wrong while handling that request.\n\n"
+                    f"{exc}\n\n"
+                    "Try rephrasing, or pick one of the example prompts below."
+                ),
                 actions=[],
                 used_llm=False,
             )
 
-        self.root.after(0, lambda: self._finish_query(reply))
+        self.root.after(0, lambda: self._finish_query(reply, api_fallback))
 
-    def _finish_query(self, reply: AssistantReply) -> None:
+    def _finish_query(
+        self,
+        reply: AssistantReply,
+        api_fallback: OfflineContext | None = None,
+    ) -> None:
         self._hide_typing()
+        if api_fallback:
+            if not self._api_degraded:
+                self._append_message("system", system_notice(api_fallback))
+                self._api_degraded = True
+            self._set_connection_status("degraded")
         self._append_message("assistant", reply.message)
         self._render_actions(reply.actions)
         self._set_busy(False)
