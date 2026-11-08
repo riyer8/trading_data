@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import ui.bootstrap  # noqa: F401
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -9,47 +13,43 @@ import pandas as pd
 import datacache
 from portfolio.portfolioInfo import MY_TICKERS
 from ui.theme import Colors, Fonts, apply_chart_theme, set_window_title
+from ui.data_utils import flatten_columns, safe_pct_change
+
 
 def all_tickers():
     return sorted(set(MY_TICKERS))
 
-def calculate_percentage_change(data):
-    last_close = data['Close'].iloc[-2]
-    today_close = data['Close'].iloc[-1]
-    return ((today_close - last_close) / last_close) * 100
 
-def top_moving_tickers():
+def top_moving_tickers(progress_cb=None):
     tickers = all_tickers()
     metrics = []
+    total = len(tickers)
 
-    for ticker in tickers:
+    for index, ticker in enumerate(tickers, start=1):
+        if progress_cb:
+            progress_cb(index, total, ticker)
+
         data = datacache.download(ticker, period="5d", interval="1d")
+        data = flatten_columns(data)
 
-        # Recent yfinance returns MultiIndex columns (field, ticker); flatten so
-        # data['Close'].iloc[-1] is a scalar rather than a Series (otherwise
-        # percentage_change is a Series and sorting the tuples below fails).
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = data.columns.get_level_values(0)
-
-        # Need at least two closes to compute a day-over-day change.
         if data.empty or len(data['Close'].dropna()) < 2:
-            print(f"Skipping {ticker}: not enough data.")
             continue
 
-        percentage_change = float(calculate_percentage_change(data))
-        metrics.append((ticker, percentage_change))
+        percentage_change = safe_pct_change(data['Close'].iloc[-1], data['Close'].iloc[-2])
+        if percentage_change is None:
+            continue
+        metrics.append((ticker, float(percentage_change)))
 
     return sorted(metrics, key=lambda x: x[1], reverse=True)
 
+
 def _heatmap_norm(values):
-    """Build a TwoSlopeNorm that won't collapse when all values are equal."""
     vmin = min(values)
     vmax = max(values)
     if vmin == vmax:
         pad = max(abs(vmin), 1.0) * 0.1
         vmin -= pad
         vmax += pad
-    # TwoSlopeNorm requires vcenter to sit strictly between vmin and vmax.
     if not (vmin < 0 < vmax):
         if vmax <= 0:
             vmax = 0.01
@@ -57,9 +57,20 @@ def _heatmap_norm(values):
             vmin = -0.01
     return mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
 
+
 def heat_map(tickers_data):
+    apply_chart_theme()
+
     if not tickers_data:
-        print("No ticker data available for heat map.")
+        fig, ax = plt.subplots(figsize=(8, 4))
+        set_window_title(fig, "Market Heat Map")
+        ax.axis("off")
+        ax.text(
+            0.5, 0.5,
+            "No ticker data available for heat map.\nCheck your connection or .datacache/.",
+            ha="center", va="center", color=Colors.TEXT, fontsize=12,
+        )
+        plt.show()
         return
 
     tickers = [item[0] for item in tickers_data]
@@ -75,17 +86,12 @@ def heat_map(tickers_data):
     cmap = mcolors.LinearSegmentedColormap.from_list(
         "BearBull", [Colors.BEAR, Colors.PANEL, Colors.BULL], N=256
     )
-
     norm = _heatmap_norm(percentages)
 
-    apply_chart_theme()
     fig, ax = plt.subplots(figsize=(7.5, 7.5))
     set_window_title(fig, "Market Heat Map")
     ax.grid(False)
     cax = ax.matshow(np.ma.masked_invalid(data), cmap=cmap, norm=norm)
-    # Status-bar hover on matshow can crash in matplotlib 3.x when the
-    # colormap range is degenerate (log10(inf)). Values are already labeled
-    # on each cell, so disable the cursor formatter.
     cax.format_cursor_data = lambda _data: ''
 
     cbar = plt.colorbar(cax, fraction=0.046, pad=0.04)
@@ -103,10 +109,28 @@ def heat_map(tickers_data):
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.set_title('Portfolio Heat Map  ·  Daily % Change', pad=16)
+    ax.set_title("Today's move across the watchlist", pad=18)
+    fig.text(
+        0.5, 0.02,
+        "Green is up, red is down. A stronger color is a bigger move.",
+        ha="center", color=Colors.MUTED, fontsize=Fonts.TICK,
+    )
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
     plt.show()
 
+
 if __name__ == "__main__":
-    heat_map(top_moving_tickers())
+    apply_chart_theme()
+    loading_fig, loading_ax = plt.subplots(figsize=(7, 2.5))
+    set_window_title(loading_fig, "Market Heat Map")
+    loading_ax.axis("off")
+    loading_ax.text(0.5, 0.5, "Loading heat map data…", ha="center", va="center", color=Colors.TEXT)
+    loading_fig.canvas.draw()
+    plt.show(block=False)
+    plt.pause(0.05)
+
+    print("Loading heat map data…")
+    tickers_data = top_moving_tickers()
+    plt.close(loading_fig)
+    heat_map(tickers_data)

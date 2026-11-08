@@ -24,6 +24,8 @@ def _action_label(module: str, args: list[str]) -> str:
         return f"RSI for {args[0]}"
     if module == "charts.ema" and args:
         return f"EMA for {args[0]}"
+    if module == "charts.stockDetail" and args:
+        return f"Snapshot — {args[0]}"
     short = module_label(module)
     return f"{short} — {' '.join(args)}" if args else short
 

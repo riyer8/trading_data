@@ -1,27 +1,33 @@
+from __future__ import annotations
+
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pandas as pd
+import ui.bootstrap  # noqa: F401
+
 import tkinter as tk
 from tkinter import ttk
 import datacache
-import time
 from portfolio.portfolioInfo import MY_TICKERS
 from ui.theme import Colors, style_table, apply_row_stripes
+from ui.data_utils import flatten_columns, format_metric
+from ui.loading import build_loading_panel, run_in_background, show_empty_state
+from ui.open_ticker import pack_open_hint, bind_tree_double_click
+
 
 def fetch_all_tickers():
     return sorted(set(MY_TICKERS))
 
+
 def get_company_info(ticker):
     try:
         info = datacache.ticker_info(ticker)
-        company_name = info.get('longName', 'N/A')
-        sector = info.get('sector', 'N/A')
-        return company_name, sector
+        return info.get('longName', 'N/A'), info.get('sector', 'N/A')
     except Exception as e:
         print(f"Error fetching company info for {ticker}: {e}")
         return 'N/A', 'N/A'
+
 
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff(1)
@@ -31,77 +37,85 @@ def calculate_rsi(data, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi.iloc[-1]
 
-def get_pe_ratio(ticker):
-    try:
-        return datacache.ticker_info(ticker).get('trailingPE', 'N/A')
-    except Exception as e:
-        print(f"Error fetching P/E ratio for {ticker}: {e}")
-        return 'N/A'
-
-def get_moving_average(data, window=50):
-    return data['Close'].rolling(window=window).mean().iloc[-1]
-
-def get_short_percent_float(ticker):
-    try:
-        return datacache.ticker_info(ticker).get('shortPercentFloat', 'N/A')
-    except Exception as e:
-        print(f"Error fetching short percent float for {ticker}: {e}")
-        return 'N/A'
-
-def get_spx_beta(ticker):
-    try:
-        return datacache.ticker_info(ticker).get('beta', 'N/A')
-    except Exception as e:
-        print(f"Error fetching SPX beta for {ticker}: {e}")
-        return 'N/A'
 
 def safe_fetch(ticker):
-    retries = 10  # Increased retry count
-    for attempt in range(retries):
-        try:
-            print(f"Fetching data for {ticker}, attempt {attempt + 1}")
-            data = datacache.download(ticker, period="6mo", interval="1d")
-            if data.empty:
-                raise ValueError(f"No data returned for {ticker}")
-            # Recent yfinance returns MultiIndex columns (field, ticker); flatten
-            # so data['Close'] is a Series and the derived RSI/price/MA values
-            # are scalars instead of Series (which break f-string formatting).
-            if isinstance(data.columns, pd.MultiIndex):
-                data.columns = data.columns.get_level_values(0)
-            return data
-        except Exception as e:
-            if "Too Many Requests" in str(e):
-                print(f"Rate limit exceeded for {ticker}, retrying in {10 * (attempt + 1)} seconds...")
-                time.sleep(10 * (attempt + 1))  # Increased retry delay
-            else:
-                print(f"Error fetching data for {ticker}: {e}")
-                break
-    return None
+    try:
+        data = datacache.download(ticker, period="6mo", interval="1d")
+        data = flatten_columns(data)
+        if data.empty:
+            return None
+        return data
+    except Exception as e:
+        print(f"Error fetching data for {ticker}: {e}")
+        return None
+
 
 def collect_technical_data(ticker):
     data = safe_fetch(ticker)
     if data is None:
-        return [None] * 6
+        return None
 
     last_price = data['Close'].iloc[-1]
     rsi = calculate_rsi(data)
-    pe_ratio = get_pe_ratio(ticker)
-    ma_50 = get_moving_average(data, 50)
-    short_percent_float = get_short_percent_float(ticker)
-    spx_beta = get_spx_beta(ticker)
+    pe_ratio = datacache.ticker_info(ticker).get('trailingPE')
+    ma_50 = data['Close'].rolling(window=50).mean().iloc[-1]
+    short_percent_float = datacache.ticker_info(ticker).get('shortPercentFloat')
+    spx_beta = datacache.ticker_info(ticker).get('beta')
     return last_price, rsi, pe_ratio, ma_50, short_percent_float, spx_beta
+
+
+def collect_all_rows(progress_cb=None):
+    rows = []
+    tickers = fetch_all_tickers()
+    total = len(tickers)
+
+    for index, ticker in enumerate(tickers, start=1):
+        if progress_cb:
+            progress_cb(index, total, ticker)
+
+        company_name, sector = get_company_info(ticker)
+        metrics = collect_technical_data(ticker)
+        if metrics is None:
+            rows.append((
+                ticker, company_name, sector,
+                "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",
+            ))
+            continue
+
+        last_price, rsi, pe_ratio, ma_50, short_percent_float, spx_beta = metrics
+        short_display = format_metric(
+            float(short_percent_float) * 100 if short_percent_float not in (None, 'N/A') else None,
+            "{:.2f}%",
+        )
+        rows.append((
+            ticker,
+            company_name,
+            sector,
+            format_metric(last_price),
+            format_metric(rsi),
+            format_metric(pe_ratio),
+            format_metric(ma_50),
+            short_display,
+            format_metric(spx_beta),
+        ))
+    return rows
+
 
 def sort_treeview_column(treeview, column, reverse):
     column_indices = {
-        "Ticker": 0, "Company Name": 1, "Sector": 2, 
-        "Last Price": 3, "RSI": 4, "P/E Ratio": 5, 
+        "Ticker": 0, "Company Name": 1, "Sector": 2,
+        "Last Price": 3, "RSI": 4, "P/E Ratio": 5,
         "50-Day MA": 6, "Short % Float": 7, "SPX Beta": 8
     }
     col_index = column_indices[column]
     items = [(treeview.item(child)['values'], child) for child in treeview.get_children()]
-    
+
     if column in ["RSI", "P/E Ratio", "50-Day MA", "Last Price", "Short % Float", "SPX Beta"]:
-        items.sort(key=lambda x: float(x[0][col_index]) if x[0][col_index] not in ["N/A", ""] else float('inf'), reverse=reverse)
+        items.sort(
+            key=lambda x: float(str(x[0][col_index]).strip('%'))
+            if x[0][col_index] not in ["N/A", ""] else float('inf'),
+            reverse=reverse,
+        )
     else:
         items.sort(key=lambda x: x[0][col_index], reverse=reverse)
 
@@ -117,51 +131,63 @@ def sort_treeview_column(treeview, column, reverse):
             treeview.heading(col, text=col, command=lambda c=col: sort_treeview_column(treeview, c, False))
     apply_row_stripes(treeview)
 
+
 def create_technical_indicators_screen():
     root = tk.Tk()
     root.title("Technical Indicators")
+    root.geometry("980x560")
     style_table(root)
+
     frame = tk.Frame(root, bg=Colors.BACKGROUND)
     frame.pack(padx=12, pady=12, fill=tk.BOTH, expand=True)
+    pack_open_hint(frame)
 
-    tickers = fetch_all_tickers()
+    status_frame, status_label, detail_label, progress = build_loading_panel(
+        frame, "Loading technical indicators…"
+    )
+
     columns = ("Ticker", "Company Name", "Sector", "Last Price", "RSI", "P/E Ratio", "50-Day MA", "Short % Float", "SPX Beta")
     tree = ttk.Treeview(frame, columns=columns, show='headings')
-
     column_widths = {
-        "Ticker": 50, "Company Name": 150, "Sector": 100, 
-        "Last Price": 100, "RSI": 80, "P/E Ratio": 80, 
+        "Ticker": 50, "Company Name": 150, "Sector": 100,
+        "Last Price": 100, "RSI": 80, "P/E Ratio": 80,
         "50-Day MA": 100, "Short % Float": 100, "SPX Beta": 100
     }
 
     for col in columns:
         tree.heading(col, text=col, command=lambda c=col: sort_treeview_column(tree, c, False))
         tree.column(col, width=column_widths[col])
+    bind_tree_double_click(tree)
 
-    for ticker in tickers:
-        company_name, sector = get_company_info(ticker)
-        last_price, rsi, pe_ratio, ma_50, short_percent_float, spx_beta = collect_technical_data(ticker)
-        
-        if last_price is None:
-            last_price_display = "N/A"
-            rsi_display = "N/A"
-            pe_ratio_display = "N/A"
-            ma_50_display = "N/A"
-            short_percent_float_display = "N/A"
-            spx_beta_display = "N/A"
-        else:
-            pe_ratio_display = f"{float(pe_ratio):.2f}" if pe_ratio != 'N/A' else pe_ratio
-            rsi_display = f"{rsi:.2f}"
-            ma_50_display = f"{ma_50:.2f}"
-            last_price_display = f"{last_price:.2f}"
-            short_percent_float_display = f"{short_percent_float:.2%}" if short_percent_float != 'N/A' else short_percent_float
-            spx_beta_display = f"{spx_beta:.2f}" if spx_beta != 'N/A' else spx_beta
+    def update_progress(done, total, ticker):
+        progress.configure(maximum=max(total, 1), value=done)
+        status_label.configure(text=f"Loading technical indicators… ({done}/{total})")
+        detail_label.configure(text=f"Fetching {ticker}")
 
-        tree.insert("", tk.END, values=(ticker, company_name, sector, last_price_display, rsi_display, pe_ratio_display, ma_50_display, short_percent_float_display, spx_beta_display))
+    def populate_table(rows):
+        status_frame.pack_forget()
+        if not rows:
+            show_empty_state(
+                status_label, detail_label, progress,
+                "No technical data loaded",
+                "Check your connection or .datacache/.",
+            )
+            status_frame.pack(fill=tk.X, pady=(0, 8))
+            return
 
-    apply_row_stripes(tree)
-    tree.pack(expand=True, fill=tk.BOTH)
+        tree.pack(expand=True, fill=tk.BOTH)
+        for row in rows:
+            tree.insert("", tk.END, values=row)
+        apply_row_stripes(tree)
+        root.title(f"Technical Indicators ({len(rows)})")
+
+    run_in_background(
+        root,
+        lambda: collect_all_rows(progress_cb=lambda d, t, s: root.after(0, update_progress, d, t, s)),
+        populate_table,
+    )
     root.mainloop()
+
 
 if __name__ == "__main__":
     create_technical_indicators_screen()

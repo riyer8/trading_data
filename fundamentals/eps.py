@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import ui.bootstrap  # noqa: F401
+
 import matplotlib.pyplot as plt
 
 import datacache
-from ui.theme import apply_chart_theme, moving_average_colors, style_legend, set_window_title
+from ui.theme import Colors, apply_chart_theme, moving_average_colors, style_legend, set_window_title
+from ui.data_utils import find_financial_row
+
 
 DEFAULT_TICKERS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA']
 
@@ -17,7 +23,16 @@ def get_quarterly_eps(ticker):
             print(f"No quarterly financials data available for {ticker}")
             return None
 
-        net_income = financials.loc['Net Income']
+        net_income = find_financial_row(
+            financials,
+            'Net Income',
+            'Net Income Common Stockholders',
+            'Net Income Applicable To Common Shares',
+        )
+        if net_income is None:
+            print(f"Net income row not found for {ticker}")
+            return None
+
         shares_outstanding = datacache.ticker_info(ticker).get('sharesOutstanding')
         if not shares_outstanding:
             print(f"Shares outstanding data not available for {ticker}")
@@ -53,13 +68,18 @@ def compare_eps(tickers):
                 alpha=1.0 if highlight else 0.9)
 
     ax.set_xlabel('Quarter')
-    ax.set_ylabel('Earnings Per Share (EPS)')
-    ax.set_title('Quarterly Earnings Per Share Growth')
+    ax.set_ylabel('Earnings per share')
+    ax.set_title('Earnings per share, by quarter', pad=18)
+    ax.text(
+        0.0, 1.02,
+        "Profit per share each quarter. A rising line means the company earned more per share.",
+        transform=ax.transAxes, color=Colors.MUTED, fontsize=9, va="bottom", clip_on=False,
+    )
     ax.margins(x=0.02)
     style_legend(ax, loc='best')
 
     fig.autofmt_xdate(rotation=30)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
     plt.show()
 
 

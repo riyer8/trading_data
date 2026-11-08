@@ -1,125 +1,158 @@
+from __future__ import annotations
+
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import mplfinance as mpf
-import pandas as pd
+import ui.bootstrap  # noqa: F401
+
 from datetime import datetime
+
 import matplotlib.pyplot as plt
-from matplotlib.widgets import RectangleSelector
+import numpy as np
+import pandas as pd
 
 import datacache
-from ui.theme import Colors, candlestick_style, moving_average_colors, style_legend, set_window_title
+from ui.chart_nav import ChartNavigator, format_price, format_volume, place_heading
+from ui.data_utils import flatten_columns
+from ui.theme import Colors, apply_chart_theme, set_window_title, style_legend
+
 
 def fetch_stock_history(ticker):
-    return datacache.ticker_history(ticker, period="max")
+    data = datacache.ticker_history(ticker, period="max")
+    return flatten_columns(data)
+
 
 def filter_data_by_lookback(stock_history, lookback_months):
     end_date = datetime.today().date()
-    start_date = end_date - pd.DateOffset(months=lookback_months)
-    
-    if stock_history.index.tz is not None:
-        stock_history.index = stock_history.index.tz_localize(None)
-    
-    return stock_history[start_date:end_date]
+    start_date = end_date - pd.DateOffset(months=int(lookback_months))
+    history = stock_history.copy()
+    if history.index.tz is not None:
+        history.index = history.index.tz_localize(None)
+    return history[start_date:end_date]
 
-def calculate_moving_averages(data, windows):
-    colors = moving_average_colors(len(windows))
-    return [
-        mpf.make_addplot(
-            data['Close'].rolling(window=ma, min_periods=1).mean(),
-            panel=0, color=color, width=1.2,
+
+def _series(frame, name):
+    if name not in frame.columns:
+        return None
+    return frame[name].astype(float)
+
+
+def build_figure(ticker, lookback_months):
+    symbol = str(ticker).strip().upper()
+    history = filter_data_by_lookback(fetch_stock_history(symbol), lookback_months)
+    close = _series(history, "Close")
+    if close is None or close.dropna().empty:
+        print(f"No data for {symbol} in the last {lookback_months} months.")
+        return None
+
+    history = history.loc[close.notna()].copy()
+    open_ = _series(history, "Open")
+    high = _series(history, "High")
+    low = _series(history, "Low")
+    close = _series(history, "Close")
+    if open_ is None:
+        open_ = close.copy()
+    if high is None:
+        high = np.maximum(open_, close)
+        high = pd.Series(high, index=history.index)
+    if low is None:
+        low = np.minimum(open_, close)
+        low = pd.Series(low, index=history.index)
+    volume = _series(history, "Volume")
+
+    close_values = close.to_numpy(dtype=float)
+    open_values = open_.to_numpy(dtype=float)
+    high_values = high.to_numpy(dtype=float)
+    low_values = low.to_numpy(dtype=float)
+    average_20 = close.rolling(20, min_periods=20).mean().to_numpy(dtype=float)
+    average_50 = close.rolling(50, min_periods=50).mean().to_numpy(dtype=float)
+    mid = close.rolling(20, min_periods=20).mean()
+    spread = close.rolling(20, min_periods=20).std()
+    band_high = (mid + 2 * spread).to_numpy(dtype=float)
+    band_low = (mid - 2 * spread).to_numpy(dtype=float)
+
+    last = float(close_values[-1])
+    previous = float(close_values[-2]) if len(close_values) > 1 else None
+    change = ((last - previous) / previous) * 100 if previous else None
+    tone = Colors.TEXT if change is None else Colors.BULL if change >= 0 else Colors.BEAR
+    change_text = "" if change is None else f"   {change:+.2f}%"
+
+    apply_chart_theme()
+    fig, (ax_price, ax_volume) = plt.subplots(
+        2, 1, sharex=True, figsize=(12.2, 7.4),
+        gridspec_kw={"height_ratios": [3.4, 1], "hspace": 0.04},
+    )
+    set_window_title(fig, f"{symbol} · Chart")
+    x = np.arange(len(history))
+    up = close_values >= open_values
+    candle_colors = np.where(up, Colors.BULL, Colors.BEAR)
+
+    ax_price.fill_between(x, band_low, band_high, color=Colors.ACCENT, alpha=0.14, label="Usual range (20-day)", zorder=1)
+    ax_price.plot(x, average_20, color=Colors.ACCENT_5, linewidth=1.3, label="20-day average", zorder=4)
+    ax_price.plot(x, average_50, color=Colors.ACCENT_3, linewidth=1.3, label="50-day average", zorder=4)
+    ax_price.vlines(x, low_values, high_values, colors=candle_colors, linewidth=0.8, zorder=3)
+    body = np.abs(close_values - open_values)
+    span = float(np.nanmax(high_values) - np.nanmin(low_values)) or 1.0
+    body = np.maximum(body, span * 0.0015)
+    ax_price.bar(
+        x, body, bottom=np.minimum(open_values, close_values),
+        width=0.62, color=candle_colors, linewidth=0, zorder=3,
+    )
+    ax_price.axhline(last, color=tone, linewidth=0.8, linestyle="--", alpha=0.75, zorder=2)
+    ax_price.set_ylabel("Price")
+    ax_price.yaxis.set_major_formatter(plt.FuncFormatter(lambda value, _pos: format_price(value)))
+    style_legend(ax_price, loc="lower left")
+
+    if volume is not None:
+        volume_values = volume.fillna(0).to_numpy(dtype=float)
+        ax_volume.bar(x, volume_values, width=0.62, color=candle_colors, alpha=0.85, linewidth=0)
+    else:
+        volume_values = np.zeros(len(x))
+    ax_volume.set_ylabel("Volume")
+    ax_volume.yaxis.set_major_formatter(plt.FuncFormatter(lambda value, _pos: format_volume(value)))
+    ax_volume.grid(axis="x", visible=False)
+
+    def describe(index: int) -> str:
+        stamp = history.index[index]
+        day = pd.Timestamp(stamp).strftime("%b %d, %Y")
+        bar_close = close_values[index]
+        prior = close_values[index - 1] if index else None
+        move = ""
+        if prior:
+            move = f"   {((bar_close - prior) / prior) * 100:+.2f}%"
+        return (
+            f"{day}\n"
+            f"Open {format_price(open_values[index])}    High {format_price(high_values[index])}\n"
+            f"Low  {format_price(low_values[index])}    Close {format_price(bar_close)}{move}\n"
+            f"Volume {format_volume(volume_values[index])}"
         )
-        for ma, color in zip(windows, colors)
-    ]
 
-def calculate_bollinger_bands(data, window=20, std_dev=2):
-    rolling_mean = data['Close'].rolling(window=window, min_periods=1).mean()
-    rolling_std = data['Close'].rolling(window=window, min_periods=1).std()
-    
-    bollinger_upper = rolling_mean + (rolling_std * std_dev)
-    bollinger_lower = rolling_mean - (rolling_std * std_dev)
-    
-    return bollinger_upper.bfill(), bollinger_lower.bfill()
-
-def plot_candlestick_chart(ticker, data, lookback_months, moving_averages, bollinger_upper, bollinger_lower):
-    fig, ax = mpf.plot(
-        data,
-        type='candle',
-        style=candlestick_style(),
-        title=f'\n{ticker.upper()}  ·  Candlestick  ·  Last {lookback_months} Months',
-        ylabel='Price (USD)',
-        addplot=moving_averages,
-        figratio=(12, 8),
-        figscale=1,
-        tight_layout=True,
-        show_nontrading=True,
-        returnfig=True,
-        warn_too_much_data=len(data) + 1000
+    place_heading(
+        fig,
+        f"{symbol}    {format_price(last)}{change_text}",
+        "Each bar is one trading day. Green closed higher than it opened. The band is the usual 20-day range.",
+        hint=ChartNavigator.HINT,
+        title_color=tone,
     )
+    ChartNavigator(
+        fig,
+        [ax_price, ax_volume],
+        history.index,
+        {
+            ax_price: {"arrays": [high_values, low_values, band_high, band_low, average_20, average_50]},
+            ax_volume: {"arrays": [volume_values], "floor": 0},
+        },
+        describe,
+    ).attach()
+    return fig
 
-    set_window_title(fig, f"{ticker.upper()} · Candlestick")
-    ax[0].fill_between(data.index, bollinger_lower, bollinger_upper,
-                       color=Colors.ACCENT, alpha=0.12, label='Bollinger Bands (20, 2σ)')
-    ax[0].plot(data.index, bollinger_upper, color=Colors.ACCENT, alpha=0.4, linewidth=0.8)
-    ax[0].plot(data.index, bollinger_lower, color=Colors.ACCENT, alpha=0.4, linewidth=0.8)
-    return fig, ax
-
-def setup_zooming(ax, fig):
-    original_xlim = ax[0].get_xlim()
-
-    def hide_selection():
-        # Hide the selection box/handles so they don't linger in the new view.
-        rectangle_selector.set_visible(False)
-        rectangle_selector.update()
-        fig.canvas.draw_idle()
-
-    def on_select(eclick, erelease):
-        start, end = eclick.xdata, erelease.xdata
-        if start is None or end is None:
-            return
-        # A single click reports a near-zero pixel span. matplotlib still fires
-        # onselect once a selection exists, so ignore it here; otherwise we'd
-        # set equal x-limits and jump to a garbage zoomed-out view.
-        if abs(erelease.x - eclick.x) < 5:
-            return
-        ax[0].set_xlim(sorted([start, end]))
-        hide_selection()
-
-    def on_double_click(event):
-        if event.dblclick:
-            ax[0].set_xlim(original_xlim)
-            hide_selection()
-
-    rectangle_selector = RectangleSelector(
-        ax[0],
-        on_select,
-        useblit=True,
-        button=[1],
-        minspanx=5, minspany=5,
-        spancoords='pixels',
-        interactive=False,
-        props=dict(edgecolor=Colors.SELECTION, linestyle='-', linewidth=1.5,
-                   facecolor=Colors.SELECTION, alpha=0.2, fill=True),
-    )
-
-    fig.canvas.mpl_connect('button_press_event', on_double_click)
-    return rectangle_selector
 
 def main(ticker, lookback_months):
-    stock_history = fetch_stock_history(ticker)
-    filtered_data = filter_data_by_lookback(stock_history, int(lookback_months))
-    moving_averages = calculate_moving_averages(filtered_data, [20, 50])
-    bollinger_upper, bollinger_lower = calculate_bollinger_bands(filtered_data)
+    fig = build_figure(ticker, lookback_months)
+    if fig is not None:
+        plt.show()
 
-    fig, ax = plot_candlestick_chart(ticker, filtered_data, lookback_months, moving_averages, bollinger_upper, bollinger_lower)
-    selector = setup_zooming(ax, fig)
-
-    plt.tight_layout()
-    fig.subplots_adjust(left=0.08, right=0.92, top=0.9, bottom=0.1)
-    ax[0].yaxis.set_ticks_position('left')
-    ax[0].yaxis.set_label_position('left')
-    plt.show()
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
@@ -128,7 +161,7 @@ if __name__ == "__main__":
     else:
         ticker_symbol = sys.argv[1]
         lookback_time = sys.argv[2]
-    
+
     if not lookback_time.isdigit():
         print("Lookback period must be a valid number.")
     else:

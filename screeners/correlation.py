@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from datetime import date
+import ui.bootstrap  # noqa: F401
+
 import tkinter as tk
 from tkinter import ttk
 import datacache
 from portfolio.portfolioInfo import MY_TICKERS
 from scipy.stats import pearsonr
 from ui.theme import Colors, style_table, apply_row_stripes
+from ui.loading import build_loading_panel, run_in_background, show_empty_state
+from ui.open_ticker import pack_open_hint, bind_tree_double_click
 
 CORRELATION_WEIGHTS = {
     'beta': 0,
@@ -73,6 +78,8 @@ def liquidity_similarity(target_info, compare_info, target_ticker, compare_ticke
         return 1
     if max(bid_ask_spread1, bid_ask_spread2) > 0:
         return 1 - abs(bid_ask_spread1 - bid_ask_spread2) / max(bid_ask_spread1, bid_ask_spread2)
+    return 0
+
 
 def pearson_correlation(target_ticker, compare_ticker):
     if target_ticker == compare_ticker:
@@ -83,14 +90,14 @@ def pearson_correlation(target_ticker, compare_ticker):
     target_prices = target_data['Close'].dropna()
     compare_prices = compare_data['Close'].dropna()
     aligned_target, aligned_compare = target_prices.align(compare_prices, join='inner')
-    
+
     if len(aligned_target) < 30:
         return 0
 
     target_returns = aligned_target.pct_change().dropna()
     compare_returns = aligned_compare.pct_change().dropna()
     returns_correlation, _ = pearsonr(target_returns, compare_returns)
-    
+
     return returns_correlation if isinstance(returns_correlation, float) else 0
 
 def returns_correlation(target_ticker, compare_ticker):
@@ -230,15 +237,19 @@ def sort_tickers(treeview, column, reverse):
 def display_tickers(symbol, min_corr_factor):
     root = tk.Tk()
     root.title(f"Tickers Correlated with {symbol}")
+    root.geometry("720x520")
     style_table(root)
 
     frame = tk.Frame(root, bg=Colors.BACKGROUND)
     frame.pack(padx=12, pady=12, fill=tk.BOTH, expand=True)
+    pack_open_hint(frame)
 
-    correlated_tickers = filter_tickers(symbol, min_corr_factor)
+    status_frame, status_label, detail_label, progress = build_loading_panel(
+        frame, f"Finding tickers correlated with {symbol}…"
+    )
+
     columns = ("Ticker", "Company Name", "Correlation", "Current Price")
     tree = ttk.Treeview(frame, columns=columns, show='headings')
-
     column_widths = {
         "Ticker": 50,
         "Company Name": 150,
@@ -249,15 +260,49 @@ def display_tickers(symbol, min_corr_factor):
     for col in columns:
         tree.heading(col, text=col, command=lambda _col=col: sort_tickers(tree, _col, False))
         tree.column(col, width=column_widths[col])
+    bind_tree_double_click(tree)
 
-    for ticker, company_name, corr_factor, current_price in correlated_tickers:
-        tree.insert("", tk.END, values=(ticker, company_name, f"{corr_factor:.2f}", f"{current_price:.2f}"))
+    def populate_table(correlated_tickers):
+        status_frame.pack_forget()
+        if not correlated_tickers:
+            show_empty_state(
+                status_label, detail_label, progress,
+                "No correlated tickers found",
+                "Try a lower correlation threshold or check your network / .datacache/.",
+            )
+            status_frame.pack(fill=tk.X, pady=(0, 8))
+            return
 
-    apply_row_stripes(tree)
-    tree.pack(expand=True, fill=tk.BOTH)
+        tree.pack(expand=True, fill=tk.BOTH)
+        for ticker, company_name, corr_factor, current_price in correlated_tickers:
+            tree.insert("", tk.END, values=(ticker, company_name, f"{corr_factor:.2f}", f"{current_price:.2f}"))
+        apply_row_stripes(tree)
+        root.title(f"Tickers Correlated with {symbol} ({len(correlated_tickers)})")
+
+    def on_error(exc):
+        show_empty_state(
+            status_label, detail_label, progress,
+            "Could not load correlation data",
+            str(exc),
+        )
+
+    run_in_background(
+        root,
+        lambda: filter_tickers(symbol, min_corr_factor),
+        populate_table,
+        on_error=on_error,
+    )
     root.mainloop()
+
 
 if __name__ == "__main__":
     symbol = input("Enter the symbol to compare: ").strip().upper()
-    min_corr_factor = float(input("Enter the minimum correlation factor (0 to 1): "))
+    if not symbol:
+        print("A ticker symbol is required.")
+        sys.exit(1)
+    try:
+        min_corr_factor = float(input("Enter the minimum correlation factor (0 to 1): "))
+    except ValueError:
+        print("Correlation factor must be a number between 0 and 1.")
+        sys.exit(1)
     display_tickers(symbol, min_corr_factor)

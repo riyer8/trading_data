@@ -1,53 +1,53 @@
+from __future__ import annotations
+
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import ui.bootstrap  # noqa: F401
+
 import tkinter as tk
 from tksheet import Sheet
 import datacache
-import time
 import numpy as np
 from screeners.correlation import filter_tickers
-from ui.theme import Colors, style_sheet
+from ui.theme import Colors, Fonts, style_sheet
+from ui.data_utils import flatten_columns
+from ui.loading import build_loading_panel, run_in_background
+from ui.open_ticker import pack_open_hint, open_ticker_views
 
-def fetch_ticker_data_with_retry(ticker, retries=5, delay=2):
-    for attempt in range(retries):
-        try:
-            history = datacache.ticker_history(ticker, period="1y")
-            info = datacache.ticker_info(ticker)
-            return history, info
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed for {ticker}: {e}")
-            if attempt < retries - 1:
-                time.sleep(delay)
-                delay *= 2
-            else:
-                print(f"Failed to fetch data for {ticker} after {retries} attempts.")
-                return None, None
 
-def ticker_data(ticker):
-    """Wrapper to fetch ticker data."""
-    history, info = fetch_ticker_data_with_retry(ticker)
-    if history is None or info is None:
-        raise ValueError(f"Could not fetch data for ticker {ticker}")
+def fetch_ticker_data(ticker):
+    history = flatten_columns(datacache.ticker_history(ticker, period="1y"))
+    info = datacache.ticker_info(ticker)
+    if history.empty:
+        raise ValueError(f"No history for {ticker}")
     return history, info
+
 
 def calculate_percentage_change(data):
     close_prices = data['Close'].to_numpy()
     percentage_changes = np.diff(close_prices) / close_prices[:-1] * 100
     return percentage_changes
 
+
 def days_percentage_changes(ticker):
     try:
-        hist, _ = ticker_data(ticker)
+        hist, _ = fetch_ticker_data(ticker)
         last_15_days = hist.tail(16)
-        return calculate_percentage_change(last_15_days)[-15:]
+        if len(last_15_days) < 2:
+            return [0.0] * 15
+        changes = calculate_percentage_change(last_15_days)
+        if len(changes) < 15:
+            padded = [0.0] * (15 - len(changes)) + list(changes)
+            return padded[-15:]
+        return list(changes[-15:])
     except Exception as e:
         print(f"Error calculating percentage changes for {ticker}: {e}")
-        return [0] * 15
+        return [0.0] * 15
+
 
 def apply_change_highlights(sheet):
-    """Color each % cell green/red based on its sign (re-applied after sorting)."""
     sheet.dehighlight_all()
     for i, row in enumerate(sheet.get_sheet_data()):
         for j, cell in enumerate(row[1:], start=1):
@@ -59,12 +59,11 @@ def apply_change_highlights(sheet):
             fg = Colors.BULL if cell_value >= 0 else Colors.BEAR
             sheet.highlight_cells(row=i, column=j, bg=bg, fg=fg)
 
+
 def sort_sheet_column(sheet, col_index):
     if col_index is None:
         return
 
-    # get_sheet_data()/set_sheet_data() operate on the whole grid. (get_data()/
-    # set_data() are span-based in tksheet 7.x and error without a span.)
     data = sheet.get_sheet_data()
     if not data:
         return
@@ -77,11 +76,11 @@ def sort_sheet_column(sheet, col_index):
                 return float(str(row[col_index]).strip('%'))
             except (ValueError, IndexError):
                 return float('-inf')
-        # Biggest movers first for the clicked day.
         data.sort(key=sort_key, reverse=True)
 
     sheet.set_sheet_data(data, reset_col_positions=False, reset_row_positions=False)
     apply_change_highlights(sheet)
+
 
 def get_clicked_column_index(event, sheet):
     x = event.x
@@ -92,11 +91,8 @@ def get_clicked_column_index(event, sheet):
             return col_index
     return None
 
-def display_percentage_changes(ticker):
-    root = tk.Tk()
-    root.title(f"Percentage Changes for {ticker} and Correlated Tickers")
-    root.configure(bg=Colors.BACKGROUND)
 
+def build_matrix(ticker):
     correlated_tickers = []
     try:
         correlated_tickers = [t for t in filter_tickers(ticker, 0) if t[0] != ticker][:5]
@@ -104,7 +100,6 @@ def display_percentage_changes(ticker):
         print(f"Error fetching correlated tickers for {ticker}: {e}")
 
     tickers_to_display = [ticker] + [t[0] for t in correlated_tickers]
-
     headers = ["Ticker"] + [f"Day {i}" for i in range(1, 16)]
     data_matrix = []
 
@@ -113,30 +108,83 @@ def display_percentage_changes(ticker):
         formatted_changes = [f"{change:.2f}%" for change in percentage_changes]
         data_matrix.append([current_ticker] + formatted_changes)
 
-    sheet = Sheet(root,
-                  data=data_matrix,
-                  headers=headers,
-                  width=1000,
-                  height=175)
-    style_sheet(sheet)
+    return headers, data_matrix
 
-    sheet.enable_bindings(("single_select", "column_select", "row_select",
-                           "row_height_resize", "double_click_column_resize",
-                           "right_click_popup_menu", "copy"))
 
-    apply_change_highlights(sheet)
+def display_percentage_changes(ticker):
+    root = tk.Tk()
+    root.title(f"Percentage Changes for {ticker} and Correlated Tickers")
+    root.configure(bg=Colors.BACKGROUND)
+    root.geometry("1020x260")
 
-    initial_width = 60
-    for col_index in range(sheet.total_columns()):
-        sheet.column_width(col_index, initial_width)
+    shell = tk.Frame(root, bg=Colors.BACKGROUND)
+    shell.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+    pack_open_hint(shell)
 
-    sheet.bind('<Button-1>', lambda event: sort_sheet_column(sheet, get_clicked_column_index(event, sheet)))
+    status_frame, status_label, detail_label, progress = build_loading_panel(
+        shell, f"Loading 15-day moves for {ticker}…"
+    )
 
-    sheet.pack(expand=True, fill=tk.BOTH)
+    def populate_sheet(result):
+        status_frame.destroy()
+        headers, data_matrix = result
+        if not data_matrix:
+            tk.Label(
+                shell,
+                text="No movement data loaded.\nCheck your connection or .datacache/.",
+                bg=Colors.BACKGROUND,
+                fg=Colors.ACCENT_5,
+                font=(Fonts.sans_name, 12),
+                justify=tk.LEFT,
+            ).pack(expand=True)
+            return
+
+        sheet = Sheet(shell,
+                        data=data_matrix,
+                        headers=headers,
+                        width=1000,
+                        height=175)
+        style_sheet(sheet)
+        sheet.enable_bindings(("single_select", "column_select", "row_select",
+                               "row_height_resize", "double_click_column_resize",
+                               "right_click_popup_menu", "copy"))
+        apply_change_highlights(sheet)
+        initial_width = 60
+        for col_index in range(sheet.total_columns()):
+            sheet.column_width(col_index, initial_width)
+        sort_job = {"id": None}
+
+        def on_click(event, sheet=sheet):
+            if sort_job["id"] is not None:
+                sheet.after_cancel(sort_job["id"])
+            column = get_clicked_column_index(event, sheet)
+            sort_job["id"] = sheet.after(250, lambda: sort_sheet_column(sheet, column))
+
+        def on_double(event, sheet=sheet):
+            if sort_job["id"] is not None:
+                sheet.after_cancel(sort_job["id"])
+                sort_job["id"] = None
+            if sheet.identify_region(event) != "table":
+                return
+            row = sheet.identify_row(event)
+            data = sheet.get_sheet_data()
+            if row is None or row < 0 or row >= len(data) or not data[row]:
+                return
+            open_ticker_views(data[row][0])
+
+        sheet.bind("<Button-1>", on_click)
+        sheet.bind("<Double-Button-1>", on_double)
+        sheet.pack(expand=True, fill=tk.BOTH)
+
+    run_in_background(root, lambda: build_matrix(ticker), populate_sheet)
     root.mainloop()
+
 
 if __name__ == "__main__":
     ticker_symbol = input("Enter the symbol: ").strip().upper()
+    if not ticker_symbol:
+        print("A ticker symbol is required.")
+        sys.exit(1)
     try:
         display_percentage_changes(ticker_symbol)
     except Exception as e:

@@ -1,112 +1,127 @@
+from __future__ import annotations
+
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import ui.bootstrap  # noqa: F401
+
 import tkinter as tk
 from tkinter import ttk
-import pandas as pd
-import time
 import datacache
-from portfolio.portfolioInfo import MY_TICKERS, ALL_TICKERS
-from charts.stockChart import main as plot_stock_chart
-from ui.theme import Colors, style_table, apply_row_stripes
-import matplotlib.pyplot as plt
-import numpy as np
-import requests
-import json
+from portfolio.portfolioInfo import MY_TICKERS
+from ui.theme import Colors, Fonts, style_table, apply_row_stripes
+from ui.data_utils import flatten_columns, safe_pct_change, to_scalar
+from ui.loading import attach_tree_scrollbar
+from ui.open_ticker import DOUBLE_CLICK_HINT, bind_tree_double_click
 
-def all_tickers():
-    print(f"Total Number of Tickers: {len(MY_TICKERS)}")
-    return sorted(set(MY_TICKERS))
+DOWNLOAD_KEY_KWARGS = {"period": "5d", "interval": "1d"}
 
-def company_info(ticker):
+
+def _terminal_progress(done: int, total: int, ticker: str) -> None:
+    print(f"  [{done:3d}/{total}] {ticker}", flush=True)
+
+
+def company_info(ticker: str) -> tuple[str, str]:
+    key = "info|" + datacache._normalize(ticker)
+    cached = datacache.read_cached(key, allow_stale=True)
+    if cached:
+        return cached.get("longName", "N/A"), cached.get("sector", "N/A")
     try:
         info = datacache.ticker_info(ticker)
-        company_name = info.get('longName', 'N/A')
-        sector = info.get('sector', 'N/A')
-        return company_name, sector
-    except (json.decoder.JSONDecodeError, requests.exceptions.RequestException) as e:
-        print(f"Error fetching data for {ticker}: {e}")
-        time.sleep(3)
-        return 'N/A', 'N/A'
+        return info.get("longName", "N/A"), info.get("sector", "N/A")
+    except Exception as exc:
+        print(f"  info skip {ticker}: {exc}")
+        return "N/A", "N/A"
 
-def calculate_percentage_change(data):
-    last_close = data['Close'].iloc[-2]
-    today_close = data['Close'].iloc[-1]
-    percentage_change = ((today_close - last_close) / last_close) * 100
-    return percentage_change
 
 def calculate_standard_deviation(data):
-    data['Percent Change'] = data['Close'].pct_change() * 100
-    return data['Percent Change'].std()
+    data = data.copy()
+    data["Percent Change"] = data["Close"].pct_change() * 100
+    return to_scalar(data["Percent Change"].std())
+
 
 def calculate_volume_change(data):
-    last_volume = data['Volume'].iloc[-2]
-    today_volume = data['Volume'].iloc[-1]
-    volume_change = ((today_volume - last_volume) / last_volume) * 100
-    return volume_change
+    last_volume = to_scalar(data["Volume"].iloc[-2])
+    today_volume = to_scalar(data["Volume"].iloc[-1])
+    if not last_volume:
+        return 0.0
+    return ((today_volume - last_volume) / last_volume) * 100
+
 
 def volume_to_string(volume):
+    volume = to_scalar(volume) or 0
     if volume >= 1e6:
         return f"{volume / 1e6:.2f}M"
-    elif volume >= 1e3:
+    if volume >= 1e3:
         return f"{volume / 1e3:.2f}K"
-    else:
-        return f"{volume:.2f}"
+    return f"{volume:.2f}"
+
 
 def string_to_volume(volume_str):
-    if volume_str.endswith('M'):
+    if volume_str.endswith("M"):
         return float(volume_str[:-1]) * 1e6
-    elif volume_str.endswith('K'):
+    if volume_str.endswith("K"):
         return float(volume_str[:-1]) * 1e3
-    else:
-        return float(volume_str)
+    return float(volume_str)
 
-def collect_data(ticker):
-    retries = 3
-    for attempt in range(retries):
-        try:
-            data = datacache.download(ticker, period="5d", interval="1d")
-            # Recent yfinance returns MultiIndex columns (field, ticker); flatten
-            # so data['Close'].iloc[-1] is a scalar instead of a Series.
-            if isinstance(data.columns, pd.MultiIndex):
-                data.columns = data.columns.get_level_values(0)
-            if not data.empty:
-                last_price = data['Close'].iloc[-1]
-                percentage_change = calculate_percentage_change(data)
-                std_change = calculate_standard_deviation(data)
-                last_volume = data['Volume'].iloc[-1]
-                volume_change = calculate_volume_change(data)
-                return last_price, percentage_change, std_change, last_volume, volume_change, data
-            else:
-                print(f"No data returned for {ticker}.")
-                return None, None, None, None, None, None
-        except Exception as e:
-            print(f"Attempt {attempt+1} failed for {ticker}: {e}")
-            time.sleep(5 * (2 ** attempt))
-    return None, None, None, None, None, None
 
-def filter_tickers():
-    tickers = all_tickers()
-    data = []
+def collect_data(ticker: str):
+    try:
+        data = flatten_columns(datacache.download(ticker, **DOWNLOAD_KEY_KWARGS))
+        if data.empty or len(data["Close"].dropna()) < 2:
+            return None
 
-    for ticker in tickers:
-        last_price, percentage_change, std_dev, volume, volume_change, stock_data = collect_data(ticker)
-        # Keep any ticker that returned a usable price >= $10. The previous
-        # check (type(last_price) == int) was always False since prices are
-        # floats, so the table came back empty.
-        if last_price is not None and float(last_price) >= 10:
-            company_name, sector = company_info(ticker)
-            data.append((ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change, stock_data))
+        last_price = to_scalar(data["Close"].iloc[-1])
+        prev_close = to_scalar(data["Close"].iloc[-2])
+        percentage_change = safe_pct_change(last_price, prev_close)
+        if last_price is None or percentage_change is None:
+            return None
 
-    data.sort(key=lambda x: x[4], reverse=True)
-    return data
+        return {
+            "ticker": ticker,
+            "last_price": float(last_price),
+            "percentage_change": float(percentage_change),
+            "std_dev": float(calculate_standard_deviation(data) or 0.0),
+            "volume": float(to_scalar(data["Volume"].iloc[-1]) or 0),
+            "volume_change": float(calculate_volume_change(data)),
+        }
+    except Exception as exc:
+        print(f"  skip {ticker}: {exc}")
+        return None
+
+
+def load_rows(progress_cb=None) -> list[dict]:
+    tickers = sorted(set(MY_TICKERS))
+    total = len(tickers)
+    rows: list[dict] = []
+
+    print(f"Loading {total} tickers (fresh cache ≤ {datacache.CACHE_TTL_SECONDS // 60} min, else network/stale)…")
+
+    for index, ticker in enumerate(tickers, start=1):
+        if progress_cb:
+            progress_cb(index, total, ticker)
+
+        row = collect_data(ticker)
+        if row is None or row["last_price"] < 10:
+            continue
+
+        company_name, sector = company_info(ticker)
+        row["company_name"] = company_name
+        row["sector"] = sector
+        rows.append(row)
+
+    rows.sort(key=lambda item: item["percentage_change"], reverse=True)
+    return rows
+
 
 def sort_tickers(treeview, column, reverse):
-    column_indices = {"Ticker": 0, "Company Name": 1, "Sector": 2, "Last Price": 3, "Percentage Change": 4, "Standard Deviation": 5, "Volume": 6, "Volume Change": 7}
+    column_indices = {
+        "Ticker": 0, "Company Name": 1, "Sector": 2, "Last Price": 3,
+        "Percentage Change": 4, "Standard Deviation": 5, "Volume": 6, "Volume Change": 7,
+    }
     col_index = column_indices[column]
-
-    items = [(treeview.item(child)['values'], child) for child in treeview.get_children()]
+    items = [(treeview.item(child)["values"], child) for child in treeview.get_children()]
 
     if column in ["Last Price", "Percentage Change", "Standard Deviation", "Volume", "Volume Change"]:
         if column == "Volume":
@@ -117,70 +132,91 @@ def sort_tickers(treeview, column, reverse):
         items.sort(key=lambda x: x[0][col_index], reverse=reverse)
 
     treeview.delete(*treeview.get_children())
-    for index, (values, item) in enumerate(items):
+    for values, item in items:
         percent_change = float(values[4])
         tag = "positive" if percent_change > 0 else "negative"
         treeview.insert("", tk.END, iid=item, values=values, tags=(tag,))
 
     for col in column_indices:
         treeview.heading(col, text=col)
-
     arrow = "↓" if reverse else "↑"
     treeview.heading(column, text=f"{column} {arrow}", command=lambda: sort_tickers(treeview, column, not reverse))
     apply_row_stripes(treeview)
 
-_chart_opening = False
 
-def on_ticker_double_click(event, tree):
-    # plt.show() spins matplotlib's own Tk event loop, which can dispatch a
-    # second buffered double-click and re-enter this handler -> two charts.
-    # Guard against re-entry while a chart is already opening.
-    global _chart_opening
-    if _chart_opening:
-        return
+def _build_table(parent, rows):
+    columns = (
+        "Ticker", "Company Name", "Sector", "Last Price",
+        "Percentage Change", "Standard Deviation", "Volume", "Volume Change",
+    )
+    tree = ttk.Treeview(parent, columns=columns, show="headings")
+    column_widths = {
+        "Ticker": 70, "Company Name": 180, "Sector": 120, "Last Price": 90,
+        "Percentage Change": 90, "Standard Deviation": 90, "Volume": 90, "Volume Change": 100,
+    }
+    for col in columns:
+        tree.heading(col, text=col, command=lambda col=col: sort_tickers(tree, col, False))
+        tree.column(col, width=column_widths[col], minwidth=60, stretch=True)
 
-    row_id = tree.identify_row(event.y)
-    if not row_id:
-        return
+    for row in rows:
+        pct = row["percentage_change"]
+        tag = "positive" if pct > 0 else "negative"
+        tree.insert(
+            "",
+            tk.END,
+            values=(
+                row["ticker"],
+                row["company_name"],
+                row["sector"],
+                f"{row['last_price']:.2f}",
+                f"{pct:.2f}",
+                f"{row['std_dev']:.2f}",
+                volume_to_string(row["volume"]),
+                f"{row['volume_change']:.2f}",
+            ),
+            tags=(tag,),
+        )
 
-    ticker = tree.item(row_id, 'values')[0]
-    _chart_opening = True
-    try:
-        plot_stock_chart(ticker, 6)
-    finally:
-        _chart_opening = False
+    bind_tree_double_click(tree)
+    attach_tree_scrollbar(parent, tree)
+    apply_row_stripes(tree)
+    return tree
 
-def display_tickers():
+
+def display_tickers(rows: list[dict]) -> None:
     root = tk.Tk()
-    root.title("Top Moving Tickers")
+    root.title(f"Top Moving Tickers ({len(rows)})")
+    root.geometry("980x560")
+    root.minsize(720, 420)
     style_table(root)
 
     frame = tk.Frame(root, bg=Colors.BACKGROUND)
     frame.pack(padx=12, pady=12, fill=tk.BOTH, expand=True)
 
-    top_moving_tickers = filter_tickers()
-    columns = ("Ticker", "Company Name", "Sector", "Last Price", "Percentage Change", "Standard Deviation", "Volume", "Volume Change")
-    tree = ttk.Treeview(frame, columns=columns, show='headings')
+    tk.Label(
+        frame,
+        text=f"{len(rows)} tickers · {DOUBLE_CLICK_HINT}",
+        bg=Colors.BACKGROUND,
+        fg=Colors.MUTED,
+        font=(Fonts.sans_name, 11),
+        anchor=tk.W,
+    ).pack(fill=tk.X, pady=(0, 8))
 
-    column_widths = {
-        "Ticker": 50, "Company Name": 150, "Sector": 100, "Last Price": 70,
-        "Percentage Change": 65, "Standard Deviation": 70, "Volume": 70, "Volume Change": 80
-    }
-    
-    for col in columns:
-        tree.heading(col, text=col, command=lambda col=col: sort_tickers(tree, col, False))
-        tree.column(col, width=column_widths[col])
-
-    tree.bind("<Double-1>", lambda event: on_ticker_double_click(event, tree))
-
-    for ticker, company_name, sector, last_price, percentage_change, std_dev, volume, volume_change, _ in top_moving_tickers:
-        tag = "positive" if percentage_change > 0 else "negative"
-        tree.insert("", tk.END, values=(ticker, company_name, sector, f"{last_price:.2f}", f"{percentage_change:.2f}", f"{std_dev:.2f}", volume_to_string(volume), f"{volume_change:.2f}"), tags=(tag,))
-
-    apply_row_stripes(tree)
-    tree.pack(expand=True, fill=tk.BOTH)
-
+    _build_table(frame, rows)
     root.mainloop()
 
+
+def main() -> None:
+    rows = load_rows(progress_cb=_terminal_progress)
+    if not rows:
+        print(
+            "\nNo ticker data loaded.\n"
+            "Run once while online so .datacache/ can fill, then retry."
+        )
+        sys.exit(1)
+    print(f"\nReady — opening table with {len(rows)} tickers.")
+    display_tickers(rows)
+
+
 if __name__ == "__main__":
-    display_tickers()
+    main()

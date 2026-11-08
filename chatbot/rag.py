@@ -70,89 +70,46 @@ def _parse_tool_table_rows(section_text: str, category: str) -> list[DocumentChu
     return chunks
 
 
+FOLDER_READMES = {
+    "screeners": PROJECT_ROOT / "screeners" / "README.md",
+    "charts": PROJECT_ROOT / "charts" / "README.md",
+    "fundamentals": PROJECT_ROOT / "fundamentals" / "README.md",
+    "launchers": PROJECT_ROOT / "launchers" / "README.md",
+    "chatbot": PROJECT_ROOT / "chatbot" / "README.md",
+}
+
+
 def load_readme_chunks(readme_path: Path | None = None) -> list[DocumentChunk]:
     path = readme_path or DEFAULT_README
-    content = path.read_text(encoding="utf-8")
     chunks: list[DocumentChunk] = []
 
-    intro_match = re.search(r"^# Trading Data Tools\n\n(.*?)\n---", content, re.DOTALL)
-    if intro_match:
+    if path.exists():
+        overview = path.read_text(encoding="utf-8").strip()
+        if overview:
+            chunks.append(
+                DocumentChunk(
+                    chunk_id="intro:overview",
+                    title="Overview",
+                    text=overview,
+                    category="overview",
+                )
+            )
+
+    for category, folder_readme in FOLDER_READMES.items():
+        if not folder_readme.exists():
+            continue
+        text = folder_readme.read_text(encoding="utf-8").strip()
+        if not text:
+            continue
         chunks.append(
             DocumentChunk(
-                chunk_id="intro:overview",
-                title="Overview",
-                text=intro_match.group(1).strip(),
-                category="overview",
+                chunk_id=f"guide:{category}",
+                title=category,
+                text=text,
+                category=category,
             )
         )
-
-    quick_start = re.search(r"## Quick start\n\n(.*?)\n---", content, re.DOTALL)
-    if quick_start:
-        chunks.append(
-            DocumentChunk(
-                chunk_id="guide:quick_start",
-                title="Quick start",
-                text=quick_start.group(1).strip(),
-                category="guide",
-            )
-        )
-
-    layout = re.search(r"## Project layout\n\n(.*?)\n---", content, re.DOTALL)
-    if layout:
-        chunks.append(
-            DocumentChunk(
-                chunk_id="guide:layout",
-                title="Project layout",
-                text=layout.group(1).strip(),
-                category="guide",
-            )
-        )
-
-    section_map = {
-        "portfolio/": "portfolio",
-        "screeners/": "screeners",
-        "charts/": "charts",
-        "fundamentals/": "fundamentals",
-        "launchers/": "launchers",
-    }
-    for heading, category in section_map.items():
-        pattern = rf"### `{re.escape(heading)}`[^\n]*\n\n(.*?)(?=\n### |\n---|\Z)"
-        match = re.search(pattern, content, re.DOTALL)
-        if match:
-            chunks.extend(_parse_tool_table_rows(match.group(1), category))
-
-    infra = re.search(r"## Shared infrastructure\n\n(.*?)\n---", content, re.DOTALL)
-    if infra:
-        chunks.append(
-            DocumentChunk(
-                chunk_id="guide:infrastructure",
-                title="Shared infrastructure",
-                text=infra.group(1).strip(),
-                category="guide",
-            )
-        )
-
-    customizing = re.search(r"## Customizing\n\n(.*?)\n---", content, re.DOTALL)
-    if customizing:
-        chunks.append(
-            DocumentChunk(
-                chunk_id="guide:customizing",
-                title="Customizing",
-                text=customizing.group(1).strip(),
-                category="guide",
-            )
-        )
-
-    notes = re.search(r"## Notes\n\n(.*?)\n---", content, re.DOTALL)
-    if notes:
-        chunks.append(
-            DocumentChunk(
-                chunk_id="guide:notes",
-                title="Notes",
-                text=notes.group(1).strip(),
-                category="guide",
-            )
-        )
+        chunks.extend(_parse_tool_table_rows(text, category))
 
     return chunks
 

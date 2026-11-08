@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import ui.bootstrap  # noqa: F401
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
 import datacache
 from ui.theme import Colors, Fonts, apply_chart_theme, style_legend, set_window_title
+from ui.data_utils import find_financial_row
 
 MAX_QUARTERS = 12
 
@@ -18,12 +23,11 @@ def get_financial_data(ticker):
         print(f"Data unavailable for {ticker}.")
         return None, None
 
-    if 'Operating Income' not in financials.index or 'Total Revenue' not in financials.index:
+    revenue = find_financial_row(financials, 'Total Revenue', 'Total Revenues')
+    operating_income = find_financial_row(financials, 'Operating Income', 'Operating Income')
+    if revenue is None or operating_income is None:
         print(f"Operating margin data unavailable for {ticker}.")
         return None, None
-
-    revenue = financials.loc['Total Revenue']
-    operating_income = financials.loc['Operating Income']
 
     operating_margin = (operating_income / revenue) * 100
 
@@ -64,13 +68,18 @@ def plot_operating_margins(ticker):
     ax.set_xticks(quarters)
     ax.set_xticklabels(tick_labels, rotation=20, ha='right')
 
-    ax.set_title(f"Operating Margin  ·  {ticker.upper()}")
+    ax.set_title(f"{ticker.upper()} operating margin, by quarter", pad=18)
+    ax.text(
+        0.0, 1.02,
+        "Share of sales left after running the business. Higher means more of each dollar stayed as operating profit.",
+        transform=ax.transAxes, color=Colors.MUTED, fontsize=Fonts.TICK, va="bottom", clip_on=False,
+    )
     ax.set_xlabel("Quarter")
-    ax.set_ylabel("Operating Margin (%)")
+    ax.set_ylabel("Operating margin (%)")
     ax.margins(x=0.03, y=0.15)
     style_legend(ax, loc='upper left')
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
     plt.show()
 
 

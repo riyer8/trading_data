@@ -13,6 +13,8 @@ from tkinter import font as tkfont
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
+import ui.bootstrap  # noqa: F401
+
 from dotenv import load_dotenv
 
 from chatbot.launcher import (
@@ -21,10 +23,12 @@ from chatbot.launcher import (
     close_process,
     format_command,
     format_running_context,
+    is_running,
     launch_module,
 )
 from chatbot.llm import AssistantReply, OpenRouterClient, ToolAction
-from chatbot.offline import ENV_HINT, OfflineContext, classify_api_error, offline_reply, system_notice
+from chatbot.connectivity import is_online
+from chatbot.offline import CACHE_HINT, ENV_HINT, OfflineContext, classify_api_error, offline_reply, system_notice
 from chatbot.entities import (
     gather_conversation_context,
     gather_user_messages,
@@ -78,6 +82,7 @@ class ChatbotApp:
         self._starters_visible = True
         self._session_entities = None
         self._api_degraded = False
+        self._network_online = is_online()
 
         self._configure_fonts()
         self._build_layout()
@@ -144,7 +149,7 @@ class ChatbotApp:
 
         self.status_dot = StatusDot(
             row,
-            color=Colors.BULL if self.llm.available else Colors.ACCENT_2,
+            color=Colors.BULL if self.llm.available and self._network_online else Colors.ACCENT_2,
         )
         self.status_dot.pack(side=tk.LEFT, padx=(0, 8))
 
@@ -173,9 +178,9 @@ class ChatbotApp:
 
         self.status_label = tk.Label(
             header,
-            text="Ready" if self.llm.available else "Offline · local tools only",
+            text=self._initial_status_text(),
             bg=Colors.BACKGROUND,
-            fg=Colors.MUTED if self.llm.available else Colors.ACCENT_5,
+            fg=self._initial_status_fg(),
             font=self.font_subtitle,
             anchor=tk.W,
         )
@@ -308,10 +313,23 @@ class ChatbotApp:
         self.chat.configure(state=tk.DISABLED)
         self._scroll_chat_to_end()
 
+    def _initial_status_text(self) -> str:
+        if not self._network_online:
+            return "Offline · no internet"
+        if not self.llm.available:
+            return "Offline · local tools only"
+        return "Ready"
+
+    def _initial_status_fg(self) -> str:
+        if not self._network_online or not self.llm.available:
+            return Colors.ACCENT_5
+        return Colors.MUTED
+
     def _set_connection_status(self, mode: str) -> None:
         labels = {
             "ready": ("Ready", Colors.MUTED, Colors.BULL),
             "offline": ("Offline · local tools only", Colors.ACCENT_5, Colors.ACCENT_2),
+            "no_internet": ("Offline · no internet", Colors.ACCENT_5, Colors.ACCENT_2),
             "degraded": ("Limited · local fallback", Colors.ACCENT_5, Colors.ACCENT_2),
         }
         text, fg, dot = labels.get(mode, labels["ready"])
@@ -323,7 +341,13 @@ class ChatbotApp:
             "assistant",
             "Ask about tools, charts, or screeners — or tap an example below.",
         )
-        if not self.llm.available:
+        if not self._network_online:
+            self._append_message(
+                "system",
+                "No internet connection — using local tool matching. "
+                f"{CACHE_HINT}",
+            )
+        elif not self.llm.available:
             self._append_message(
                 "system",
                 "Offline mode — I can still match README tools and launch them locally. "
@@ -451,8 +475,26 @@ class ChatbotApp:
                     "system", f"Launched {c} (pid {pid})"
                 ),
             )
+            threading.Thread(
+                target=self._watch_launch,
+                args=(result.pid, cmd, result.log_path),
+                daemon=True,
+            ).start()
         except Exception as exc:
             self.root.after(0, lambda e=exc: messagebox.showerror("Launch failed", str(e)))
+
+    def _watch_launch(self, pid: int, cmd: str, log_path: str) -> None:
+        import time
+
+        time.sleep(2.5)
+        if is_running(pid):
+            return
+        message = (
+            f"{cmd} exited immediately.\n\n"
+            f"Check the log for details:\n{log_path}\n\n"
+            "You can also run the same command in a terminal to see errors."
+        )
+        self.root.after(0, lambda m=message: self._append_message("system", m))
 
     def _close_worker(self, action: ToolAction) -> None:
         try:
@@ -546,7 +588,10 @@ class ChatbotApp:
             user_only = gather_user_messages(self.history, user_message)
             rag_modules = [item.chunk.module for item in retrieved if item.chunk.module]
 
-            if self.llm.available:
+            online = is_online()
+            self._network_online = online
+
+            if self.llm.available and online:
                 try:
                     reply = self.llm.chat(
                         user_message,
@@ -568,8 +613,11 @@ class ChatbotApp:
                     )
                     self._session_entities = reply.entities
             else:
-                reply = offline_reply(user_message, self.history, retrieved, reason="missing_key")
+                reason = "network" if self.llm.available and not online else "missing_key"
+                reply = offline_reply(user_message, self.history, retrieved, reason=reason)
                 self._session_entities = reply.entities
+                if reason == "network":
+                    api_fallback = OfflineContext("network")
 
             self.history.append({"role": "user", "content": user_message})
             self.history.append({"role": "assistant", "content": reply.message})
@@ -594,9 +642,15 @@ class ChatbotApp:
         self._hide_typing()
         if api_fallback:
             if not self._api_degraded:
-                self._append_message("system", system_notice(api_fallback))
+                notice = system_notice(api_fallback)
+                if api_fallback.reason == "network":
+                    notice = f"{notice} {CACHE_HINT}"
+                self._append_message("system", notice)
                 self._api_degraded = True
-            self._set_connection_status("degraded")
+            if api_fallback.reason == "network" or not self._network_online:
+                self._set_connection_status("no_internet")
+            else:
+                self._set_connection_status("degraded")
         self._append_message("assistant", reply.message)
         self._render_actions(reply.actions)
         self._set_busy(False)

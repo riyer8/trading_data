@@ -18,6 +18,7 @@ from chatbot.llm import AssistantReply, ToolAction
 from chatbot.rag import RetrievedChunk
 
 ENV_HINT = "Add OPENROUTER_API_KEY to chatbot/.env for full AI answers."
+CACHE_HINT = "Launched tools will use cached market data from .datacache/ when the network is unavailable."
 
 REASON_COPY = {
     "missing_key": "Running offline — no API key configured.",
@@ -86,9 +87,27 @@ def _format_tool_hints(retrieved: list[RetrievedChunk], limit: int = 3) -> list[
     return lines
 
 
-def _resume_hint(ctx: OfflineContext) -> str:
+def _cache_hint() -> str | None:
+    try:
+        from datacache import has_cached_data
+    except ImportError:
+        return None
+    if has_cached_data():
+        return CACHE_HINT
+    return "Market data tools need at least one online session to populate .datacache/."
+
+
+def _resume_hint(ctx: OfflineContext, *, include_cache: bool = True) -> str:
     if ctx.reason in ("missing_key", "auth_failed"):
         return ENV_HINT
+    if ctx.reason == "network":
+        lines: list[str] = []
+        if include_cache:
+            cache_line = _cache_hint()
+            if cache_line:
+                lines.append(cache_line)
+        lines.append("Full AI answers will resume when you're back online.")
+        return "\n".join(lines)
     return "Full AI answers will resume when OpenRouter is available again."
 
 
@@ -115,8 +134,14 @@ def _compose_message(
         elif closes:
             parts.append("I can close the matching tools locally.")
 
+        if ctx.reason == "network":
+            cache_line = _cache_hint()
+            if cache_line:
+                parts.append("")
+                parts.append(cache_line)
+
         parts.append("")
-        parts.append(_resume_hint(ctx))
+        parts.append(_resume_hint(ctx, include_cache=False))
         return "\n".join(parts)
 
     parts.append(REASON_COPY.get(ctx.reason, REASON_COPY["unknown"]))

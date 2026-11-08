@@ -20,6 +20,7 @@ class LaunchResult:
     module: str
     args: tuple[str, ...]
     pid: int
+    log_path: str = ""
 
 
 @dataclass
@@ -39,12 +40,25 @@ class TrackedProcess:
         return f"{base} {arg_text}".strip() if arg_text else base
 
 
+def is_running(pid: int) -> bool:
+    return _is_alive(pid)
+
+
+def launch_log_dir() -> str:
+    return os.path.join(PROJECT_ROOT, ".runlogs")
+
+
 def launch_module(module: str, args: list[str] | None = None) -> LaunchResult:
     """Launch a tool in a detached process so the chatbot stays responsive."""
     args = args or []
+    os.makedirs(launch_log_dir(), exist_ok=True)
+    log_path = os.path.join(launch_log_dir(), f"{module.replace('.', '-')}.log")
+    log_file = open(log_path, "w", encoding="utf-8")
     popen_kwargs: dict = {
         "cwd": PROJECT_ROOT,
         "stdin": subprocess.DEVNULL,
+        "stdout": log_file,
+        "stderr": subprocess.STDOUT,
         "env": os.environ.copy(),
     }
     if sys.platform == "win32":
@@ -62,7 +76,7 @@ def launch_module(module: str, args: list[str] | None = None) -> LaunchResult:
     tracked = TrackedProcess(pid=process.pid, module=module, args=tuple(args))
     with _lock:
         _registry[process.pid] = tracked
-    return LaunchResult(module=module, args=tuple(args), pid=process.pid)
+    return LaunchResult(module=module, args=tuple(args), pid=process.pid, log_path=log_path)
 
 
 def _is_alive(pid: int) -> bool:

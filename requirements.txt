@@ -5,3 +5,5 @@ pandas
 numpy
 scipy
 tksheet
+python-dotenv
+requests

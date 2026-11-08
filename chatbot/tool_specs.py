@@ -13,6 +13,7 @@ class ModuleSpec:
 
 # Keys are ``python -m`` module paths from the README.
 TOOL_SPECS: dict[str, ModuleSpec] = {
+    "charts.stockDetail": ModuleSpec(min_tickers=1),
     "charts.vwap": ModuleSpec(min_tickers=1),
     "charts.ema": ModuleSpec(min_tickers=1),
     "charts.rsi_trend": ModuleSpec(min_tickers=1),

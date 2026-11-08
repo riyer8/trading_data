@@ -42,6 +42,7 @@ _COMMON_TYPOS = {
 
 # Longer phrases first — "stock chart" must win over generic chart-adjacent tools.
 _INTENT_MODULES: list[tuple[tuple[str, ...], str]] = [
+    (("snapshot", "stock detail"), "charts.stockDetail"),
     (("stock chart", "stockchart", "candlestick", "candlesticks"), "charts.stockChart"),
     (("open single ticker", "single ticker app"), "launchers.openSingleTickerApp"),
     (("vwap",), "charts.vwap"),
@@ -62,6 +63,7 @@ _INTENT_MODULES: list[tuple[tuple[str, ...], str]] = [
 
 _MODULE_LABELS = {
     "charts.stockChart": "Stock chart",
+    "charts.stockDetail": "Snapshot",
     "charts.vwap": "VWAP",
     "charts.rsi_trend": "RSI",
     "charts.ema": "EMA",

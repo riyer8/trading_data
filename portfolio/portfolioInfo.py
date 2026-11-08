@@ -10,7 +10,7 @@ TECHNOLOGY_COMPANIES = [
 # Semiconductor Companies
 SEMICONDUCTOR_COMPANIES = [
     'NVDA', 'ASML', 'MU', 'AMAT', 'LRCX', 'AVGO', 'QCOM', 'ON', 'SMCI', 'CRUS',
-    'TXN', 'SWKS'
+    'TXN', 'SWKS', 'SMH'
 ]
 
 # Consumer Discretionary Companies
@@ -31,7 +31,7 @@ HEALTHCARE_COMPANIES = [
 
 # Financial Companies
 FINANCIAL_COMPANIES = [
-    'JPM', 'BAC', 'C', 'GS', 'V', 'MA', 'AXP', 'MS', 'BK'
+    'JPM', 'BAC', 'C', 'GS', 'V', 'MA', 'AXP', 'MS'
 ]
 
 # Consumer Staples Companies
